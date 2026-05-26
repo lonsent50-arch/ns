@@ -6469,7 +6469,7 @@ if is_supabase_configured():
 
 if __name__ == '__main__':
     import sys
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5050
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get('PORT', 5050))
     print('=' * 60)
     print('  📖 Novel Studio — 专业小说写作工具')
     print(f'  运行地址: http://localhost:{port}')
