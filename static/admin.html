@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Novel Studio - 管理后台</title>
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Novel Studio">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-container { max-width:1100px; margin:0 auto; padding:28px; }
+        .admin-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap;gap:12px; }
+        .admin-header h1 { font-size:22px; color:var(--accent); margin:0; }
+        .admin-login { max-width:400px; margin:100px auto; text-align:center; }
+        .admin-tabs { display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0; }
+        .admin-tab { padding:8px 16px;border:none;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s; }
+        .admin-tab:hover { color:var(--text-primary); }
+        .admin-tab.active { color:var(--accent);border-bottom-color:var(--accent);font-weight:600; }
+        .admin-panel { display:none; }
+        .admin-panel.active { display:block; }
+        .admin-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+        .admin-table th, .admin-table td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--border); }
+        .admin-table th { color:var(--text-muted); font-weight:600; font-size:11px; text-transform:uppercase; }
+        .admin-table tr:hover { background:var(--bg-hover); }
+        .badge { padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; }
+        .badge-active { background:rgba(63,185,80,0.2); color:var(--green); }
+        .badge-pending { background:rgba(210,153,34,0.2); color:var(--yellow); }
+        .badge-expired,.badge-cancelled { background:rgba(248,81,73,0.2); color:#f85149; }
+        .badge-revoked,.badge-refunded { background:rgba(139,148,158,0.2); color:var(--text-muted); }
+        .form-card { padding:16px; background:var(--bg-surface2); border-radius:8px; border:1px solid var(--border); margin-bottom:16px; }
+        .form-card label { font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;display:block; }
+        .form-card input, .form-card select, .form-card textarea { width:100%; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:5px; color:var(--text-primary); font-size:12px; font-family:inherit; }
+        .form-card textarea { resize:vertical; min-height:60px; }
+        .form-row { display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap; }
+        .form-row > div { flex:1;min-width:120px; }
+        .stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+        .stat-card { background:var(--bg-surface2);border:1px solid var(--border);border-radius:8px;padding:16px; }
+        .stat-card .stat-value { font-size:24px;font-weight:700; }
+        .stat-card .stat-label { font-size:11px;color:var(--text-muted);margin-top:4px; }
+        .stat-card.green .stat-value { color:var(--green); }
+        .stat-card.yellow .stat-value { color:var(--yellow); }
+        .stat-card.accent .stat-value { color:var(--accent); }
+        .qr-preview { max-width:200px;max-height:200px;border:1px solid var(--border);border-radius:6px;margin-top:8px;display:none; }
+        .config-hint { font-size:10px;color:var(--text-muted);margin-top:4px; }
+        .section-title { font-size:15px;font-weight:600;margin-bottom:12px;color:var(--text-primary);display:flex;align-items:center;gap:8px; }
+    </style>
+</head>
+<body style="min-height:100vh;">
+<div class="admin-container" id="admin-main" style="display:none;">
+    <div class="admin-header">
+        <h1>⚙️ 管理后台</h1>
+        <button class="btn btn-ghost btn-sm" onclick="location.reload()">🔄 刷新</button>
+    </div>
+
+    <!-- Tab 导航 -->
+    <div class="admin-tabs">
+        <button class="admin-tab active" onclick="switchAdminTab('balances')">💎 用户余额</button>
+        <button class="admin-tab" onclick="switchAdminTab('finance')">💰 资金管理</button>
+        <button class="admin-tab" onclick="switchAdminTab('payment')">💳 收款配置</button>
+        <button class="admin-tab" onclick="switchAdminTab('contact')">📞 联系方式</button>
+        <button class="admin-tab" onclick="switchAdminTab('customers')">👥 客户管理</button>
+        <button class="admin-tab" onclick="switchAdminTab('accounts')">💹 资金流水</button>
+        <button class="admin-tab" onclick="switchAdminTab('license')">🎫 许可证管理</button>
+    </div>
+
+    <!-- ===== 用户余额 ===== -->
+    <div class="admin-panel active" id="panel-balances">
+        <div class="section-title">💎 用户余额管理</div>
+        <div style="overflow-x:auto;">
+            <table class="admin-table">
+                <thead><tr><th>用户ID</th><th>余额</th><th>累计充值</th><th>累计消费</th><th>交易次数</th><th>免费额度</th><th>操作</th></tr></thead>
+                <tbody id="balance-table-body"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">加载中...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== 许可证管理 ===== -->
+    <div class="admin-panel" id="panel-license">
+        <div class="form-card">
+            <div class="form-row">
+                <div>
+                    <label>套餐类型</label>
+                    <select id="gen-tier">
+                        <option value="day">日卡 ¥9.9</option>
+                        <option value="week">周卡 ¥29.9</option>
+                        <option value="month" selected>月卡 ¥49.9</option>
+                        <option value="year">年卡 ¥299</option>
+                    </select>
+                </div>
+                <div><label>数量</label><input type="number" id="gen-count" value="1" min="1" max="50"></div>
+                <div><label>客户邮箱</label><input type="email" id="gen-email" placeholder="optional"></div>
+                <div><label>客户姓名</label><input type="text" id="gen-name" placeholder="optional"></div>
+                <div><button class="btn btn-primary" onclick="generateKeys()">🎫 生成密钥</button></div>
+            </div>
+        </div>
+
+        <div id="generated-keys" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg-surface2);border:1px solid var(--green);border-radius:8px;"></div>
+
+        <div class="section-title">📋 许可证列表</div>
+        <div style="overflow-x:auto;">
+            <table class="admin-table">
+                <thead><tr><th>密钥</th><th>套餐</th><th>状态</th><th>客户</th><th>激活时间</th><th>到期时间</th><th>操作</th></tr></thead>
+                <tbody id="license-table-body"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">加载中...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== 资金管理 ===== -->
+    <div class="admin-panel" id="panel-finance">
+        <div class="stat-grid" id="finance-stats"></div>
+
+        <div class="section-title">📋 购买订单</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <button class="btn btn-sm" onclick="loadPurchases('')" id="filter-all">全部</button>
+            <button class="btn btn-sm" onclick="loadPurchases('paid')" id="filter-paid">已支付</button>
+            <button class="btn btn-sm" onclick="loadPurchases('pending')" id="filter-pending">待支付</button>
+            <button class="btn btn-sm" onclick="loadPurchases('refunded')" id="filter-refunded">已退款</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="admin-table">
+                <thead><tr><th>订单ID</th><th>套餐</th><th>金额</th><th>状态</th><th>客户</th><th>许可证</th><th>创建时间</th><th>操作</th></tr></thead>
+                <tbody id="purchase-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== 收款配置 ===== -->
+    <div class="admin-panel" id="panel-payment">
+        <div class="section-title">🏦 银行转账</div>
+        <div class="form-card">
+            <div class="form-row">
+                <div><label>收款人姓名</label><input type="text" id="bank-holder" placeholder="张三"></div>
+                <div><label>银行名称</label><input type="text" id="bank-name" placeholder="中国工商银行"></div>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div><label>银行卡号</label><input type="text" id="bank-account" placeholder="6222 xxxx xxxx xxxx"></div>
+            </div>
+        </div>
+
+        <div class="section-title">📱 微信收款码</div>
+        <div class="form-card">
+            <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <label>上传图片文件</label>
+                    <input type="file" id="wechat-qr-file" accept="image/*" onchange="previewQrFile('wechat-qr-file','wechat-qr-preview','wechat-qr')" style="padding:6px;">
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    <label>或填写 URL / Base64</label>
+                    <textarea id="wechat-qr" placeholder="https://... 或 data:image/png;base64,..." style="min-height:40px;"></textarea>
+                </div>
+            </div>
+            <img id="wechat-qr-preview" class="qr-preview">
+            <button class="btn btn-sm btn-ghost" onclick="uploadQrFile('wechat-qr-file','wechat-qr')" style="margin-top:8px;">⬆️ 上传微信收款码</button>
+            <span id="wechat-upload-msg" style="margin-left:8px;font-size:11px;"></span>
+        </div>
+
+        <div class="section-title">📱 支付宝收款码</div>
+        <div class="form-card">
+            <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <label>上传图片文件</label>
+                    <input type="file" id="alipay-qr-file" accept="image/*" onchange="previewQrFile('alipay-qr-file','alipay-qr-preview','alipay-qr')" style="padding:6px;">
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    <label>或填写 URL / Base64</label>
+                    <textarea id="alipay-qr" placeholder="https://... 或 data:image/png;base64,..." style="min-height:40px;"></textarea>
+                </div>
+            </div>
+            <img id="alipay-qr-preview" class="qr-preview">
+            <button class="btn btn-sm btn-ghost" onclick="uploadQrFile('alipay-qr-file','alipay-qr')" style="margin-top:8px;">⬆️ 上传支付宝收款码</button>
+            <span id="alipay-upload-msg" style="margin-left:8px;font-size:11px;"></span>
+        </div>
+
+        <button class="btn btn-primary" onclick="savePaymentConfig()" style="margin-top:8px;">💾 保存收款配置</button>
+        <span id="payment-save-msg" style="margin-left:12px;font-size:12px;"></span>
+    </div>
+
+    <!-- ===== 联系方式 ===== -->
+    <div class="admin-panel" id="panel-contact">
+        <div class="form-card">
+            <div class="form-row">
+                <div><label>微信号</label><input type="text" id="contact-wechat" placeholder="WeChat ID"></div>
+                <div><label>邮箱</label><input type="email" id="contact-email" placeholder="email@example.com"></div>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div><label>手机号</label><input type="text" id="contact-phone" placeholder="138xxxx"></div>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div><label>备注说明</label><input type="text" id="contact-note" placeholder="如：工作日 10:00-18:00 在线"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveContactConfig()">💾 保存联系方式</button>
+        <span id="contact-save-msg" style="margin-left:12px;font-size:12px;"></span>
+    </div>
+
+    <!-- ===== 客户管理 ===== -->
+    <div class="admin-panel" id="panel-customers">
+        <div class="stat-grid" id="customer-stats"></div>
+        <div class="section-title">👥 客户列表</div>
+        <div style="overflow-x:auto;">
+            <table class="admin-table">
+                <thead><tr><th>客户姓名</th><th>邮箱</th><th>手机</th><th>累计消费</th><th>项目数</th><th>AI调用</th><th>最后活跃</th><th>操作</th></tr></thead>
+                <tbody id="customer-table-body"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">加载中...</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- Customer detail panel -->
+        <div id="customer-detail" style="display:none;margin-top:16px;padding:16px;background:var(--bg-surface2);border:1px solid var(--border);border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <strong style="color:var(--accent);" id="customer-detail-title">客户详情</strong>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('customer-detail').style.display='none'">✕ 关闭</button>
+            </div>
+            <div class="form-row">
+                <div><label>姓名</label><input type="text" id="cust-name"></div>
+                <div><label>邮箱</label><input type="email" id="cust-email"></div>
+                <div><label>手机</label><input type="text" id="cust-phone"></div>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div><label>累计消费 ¥</label><input type="text" id="cust-spend" disabled></div>
+                <div><label>项目数</label><input type="text" id="cust-projects" disabled></div>
+                <div><label>AI调用数</label><input type="text" id="cust-ai-calls" disabled></div>
+            </div>
+            <div class="form-row" style="margin-top:8px;">
+                <div><label>备注</label><input type="text" id="cust-notes" placeholder="管理员备注"></div>
+            </div>
+            <button class="btn btn-primary" onclick="saveCustomerDetail()" style="margin-top:8px;">💾 保存</button>
+            <span id="cust-save-msg" style="margin-left:12px;font-size:12px;"></span>
+        </div>
+    </div>
+
+    <!-- ===== 资金流水 ===== -->
+    <div class="admin-panel" id="panel-accounts">
+        <div class="stat-grid" id="account-stats"></div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:280px;">
+                <div class="section-title">📋 流水记录</div>
+            </div>
+            <div style="flex:0 0 340px;">
+                <div class="section-title">➕ 手动记录</div>
+                <div class="form-card">
+                    <div class="form-row">
+                        <div>
+                            <label>类型</label>
+                            <select id="acc-type">
+                                <option value="withdrawal">提现</option>
+                                <option value="refund">退款</option>
+                                <option value="deposit">充值</option>
+                                <option value="adjustment">调账</option>
+                            </select>
+                        </div>
+                        <div><label>金额 ¥</label><input type="number" id="acc-amount" step="0.01" min="0.01" placeholder="0.00"></div>
+                    </div>
+                    <div class="form-row" style="margin-top:8px;">
+                        <div><label>关联客户邮箱</label><input type="email" id="acc-email" placeholder="可选"></div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <label>备注</label><input type="text" id="acc-desc" placeholder="流水说明">
+                    </div>
+                    <button class="btn btn-primary" onclick="createAccountRecord()" style="margin-top:8px;">💾 记录</button>
+                    <span id="acc-save-msg" style="margin-left:12px;font-size:12px;"></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="overflow-x:auto;margin-top:12px;">
+            <table class="admin-table">
+                <thead><tr><th>ID</th><th>类型</th><th>金额</th><th>客户</th><th>备注</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+                <tbody id="account-table-body"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">加载中...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="admin-login" id="admin-login">
+    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:32px;">
+        <h2 style="color:var(--accent);margin-bottom:20px;">🔐 管理员登录</h2>
+        <div class="form-group">
+            <input type="password" id="admin-password" placeholder="请输入管理员密码" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <button class="btn btn-primary" onclick="adminLogin()" style="width:100%;justify-content:center;">登录</button>
+        <div id="login-error" style="display:none;color:#f85149;font-size:12px;margin-top:8px;text-align:center;"></div>
+    </div>
+</div>
+
+<script>
+let _adminToken = null;
+const tierNames = {day:'日卡',week:'周卡',month:'月卡',year:'年卡'};
+
+function adminFetch(url, opts = {}) {
+    opts.headers = opts.headers || {};
+    if (_adminToken) opts.headers['X-Admin-Token'] = _adminToken;
+    return fetch(url, opts);
+}
+
+async function adminLogin() {
+    const pwd = document.getElementById('admin-password').value;
+    try {
+        const resp = await fetch('/api/admin/verify', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pwd}) });
+        const data = await resp.json();
+        if (data.token) {
+            _adminToken = data.token;
+            document.getElementById('admin-login').style.display = 'none';
+            document.getElementById('admin-main').style.display = 'block';
+            loadBalances();
+            loadFinanceData();
+        } else {
+            document.getElementById('login-error').textContent = data.error || '密码错误';
+            document.getElementById('login-error').style.display = 'block';
+        }
+    } catch(e) {
+        document.getElementById('login-error').textContent = '连接失败: '+e.message;
+        document.getElementById('login-error').style.display = 'block';
+    }
+}
+
+function switchAdminTab(tab) {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('.admin-tab[onclick*="'+tab+'"]').classList.add('active');
+    document.getElementById('panel-'+tab).classList.add('active');
+    if (tab === 'balances') loadBalances();
+    if (tab === 'license') loadLicenseData();
+    if (tab === 'finance') { loadFinanceData(); }
+    if (tab === 'payment') loadPaymentConfig();
+    if (tab === 'contact') loadContactConfig();
+    if (tab === 'customers') loadCustomers();
+    if (tab === 'accounts') loadPlatformAccounts();
+}
+
+// ===== 用户余额管理 =====
+async function loadBalances() {
+    const tbody = document.getElementById('balance-table-body');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">加载中...</td></tr>';
+    try {
+        const resp = await adminFetch('/api/admin/balances');
+        const data = await resp.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">暂无用户数据</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(u => {
+            const uid = (u.user_id || '').slice(0, 16);
+            const bal = (u.balance || 0).toFixed(2);
+            const recharged = (u.total_recharged || 0).toFixed(2);
+            const cost = (u.total_cost || 0).toFixed(2);
+            const txnCount = u.txn_count || 0;
+            const freeRemaining = ((u.free_daily_credits || 0) - (u.free_daily_used || 0)).toFixed(2);
+            return `<tr>
+                <td style="font-family:monospace;font-size:11px;" title="${u.user_id}">${uid}...</td>
+                <td style="font-weight:600;color:${bal>0?'var(--green)':'var(--text-primary)'};">¥${bal}</td>
+                <td>¥${recharged}</td>
+                <td style="color:var(--red);">¥${cost}</td>
+                <td>${txnCount} 次</td>
+                <td>¥${freeRemaining}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="showAdjustBalance('${u.user_id}',${bal})" style="font-size:11px;padding:3px 8px;">调整</button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f85149;padding:20px;">加载失败: '+e.message+'</td></tr>';
+    }
+}
+
+function showAdjustBalance(userId, currentBal) {
+    const delta = prompt(`调整余额\n当前余额: ¥${parseFloat(currentBal).toFixed(2)}\n输入正数充值，负数扣除：`, '0');
+    if (delta === null || delta === '' || isNaN(parseFloat(delta)) || parseFloat(delta) === 0) return;
+    adjustBalance(userId, parseFloat(delta));
+}
+
+async function adjustBalance(userId, delta) {
+    try {
+        const resp = await adminFetch('/api/admin/balances/adjust', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({user_id: userId, delta: delta})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert(`操作成功！${delta > 0 ? '充值' : '扣除'} ¥${Math.abs(delta).toFixed(2)}\n新余额: ¥${data.new_balance.toFixed(2)}`);
+            loadBalances();
+        } else {
+            alert('操作失败: ' + (data.error || '未知错误'));
+        }
+    } catch(e) {
+        alert('操作失败: ' + e.message);
+    }
+}
+
+// ===== 许可证管理 =====
+async function loadLicenseData() {
+    try {
+        const stats = await (await adminFetch('/api/admin/stats')).json();
+    } catch(e) { console.error('加载统计数据失败:', e); }
+    try {
+        const licenses = await (await adminFetch('/api/admin/licenses')).json();
+        const statusBadge = { active:'<span class="badge badge-active">已激活</span>', pending:'<span class="badge badge-pending">未激活</span>', expired:'<span class="badge badge-expired">已过期</span>', revoked:'<span class="badge badge-revoked">已吊销</span>' };
+        document.getElementById('license-table-body').innerHTML = licenses.map(l => {
+            const activatedAt = l.activated_at ? new Date(l.activated_at).toLocaleDateString('zh-CN') : '-';
+            const expiresAt = l.expires_at ? new Date(l.expires_at).toLocaleDateString('zh-CN') : '-';
+            const c = l.customer_name ? (l.customer_name+(l.customer_email?' ('+l.customer_email+')':'')) : '-';
+            return `<tr>
+                <td style="font-family:monospace;font-size:11px;" title="${l.id}">${l.id.substring(0,20)}...</td>
+                <td>${tierNames[l.tier]||l.tier}</td>
+                <td>${statusBadge[l.status]||l.status}</td>
+                <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c}">${c}</td>
+                <td>${activatedAt}</td>
+                <td>${expiresAt}</td>
+                <td>${l.status==='active' ? '<button class="btn btn-danger btn-sm" onclick="revokeLicense(\''+l.id+'\')">吊销</button>' : '-'}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('license-table-body').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f85149;padding:20px;">加载失败</td></tr>';
+    }
+}
+
+async function generateKeys() {
+    const tier = document.getElementById('gen-tier').value;
+    const count = parseInt(document.getElementById('gen-count').value) || 1;
+    const email = document.getElementById('gen-email').value.trim();
+    const name = document.getElementById('gen-name').value.trim();
+    try {
+        const resp = await adminFetch('/api/admin/licenses/generate', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ tier, count, email, name })
+        });
+        const data = await resp.json();
+        if (data.keys) {
+            const div = document.getElementById('generated-keys');
+            div.innerHTML = '<strong style="color:var(--green);font-size:13px;">✅ 已生成密钥：</strong><div style="margin-top:8px;">'+
+                data.keys.map(k =>
+                    '<div style="font-family:monospace;padding:4px 0;font-size:13px;display:flex;align-items:center;gap:8px;">'+
+                    '<span>'+k.key+'</span>'+
+                    '<span class="badge badge-active">'+(tierNames[k.tier]||k.tier)+'</span>'+
+                    '<button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText(\''+k.key+'\')">📋</button>'+
+                    '</div>'
+                ).join('')+'</div>';
+            div.style.display = 'block';
+            loadLicenseData();
+        }
+    } catch(e) { alert('生成失败: '+e.message); }
+}
+
+async function revokeLicense(key) {
+    if (!confirm(`确定吊销密钥 ${key}？`)) return;
+    await adminFetch('/api/admin/licenses/'+encodeURIComponent(key)+'/revoke', { method:'POST' });
+    loadLicenseData();
+}
+
+// ===== 资金管理 =====
+async function loadFinanceData() {
+    try {
+        const s = await (await adminFetch('/api/admin/finance-summary')).json();
+        document.getElementById('finance-stats').innerHTML =
+            `<div class="stat-card green"><div class="stat-value">¥${s.total_revenue.toFixed(2)}</div><div class="stat-label">总收入</div></div>`+
+            `<div class="stat-card accent"><div class="stat-value">¥${s.month_revenue.toFixed(2)}</div><div class="stat-label">本月收入</div></div>`+
+            `<div class="stat-card yellow"><div class="stat-value">¥${s.pending_amount.toFixed(2)}</div><div class="stat-label">待收款</div></div>`+
+            `<div class="stat-card"><div class="stat-value">${s.paid_orders}/${s.total_orders}</div><div class="stat-label">已付/总订单</div></div>`;
+    } catch(e) { console.error('加载财务数据失败:', e); }
+    loadPurchases('');
+}
+
+async function loadPurchases(status) {
+    // Update filter buttons
+    document.querySelectorAll('#panel-finance .btn-sm').forEach(b => b.style.background='');
+    const activeBtn = document.getElementById('filter-'+(status||'all'));
+    if (activeBtn) activeBtn.style.background = 'var(--bg-hover)';
+
+    try {
+        const url = status ? '/api/admin/purchases?status='+status : '/api/admin/purchases';
+        const purchases = await (await adminFetch(url)).json();
+        const statusBadge = { paid:'<span class="badge badge-active">已支付</span>', pending:'<span class="badge badge-pending">待支付</span>', cancelled:'<span class="badge badge-cancelled">已取消</span>', refunded:'<span class="badge badge-refunded">已退款</span>' };
+        document.getElementById('purchase-table-body').innerHTML = purchases.map(p => {
+            const created = p.created_at ? new Date(p.created_at).toLocaleString('zh-CN') : '-';
+            const customer = p.customer_email || '-';
+            return `<tr>
+                <td style="font-family:monospace;font-size:10px;" title="${p.id}">${p.id.substring(0,16)}...</td>
+                <td>${tierNames[p.tier]||p.tier}</td>
+                <td style="font-weight:600;">¥${p.amount}</td>
+                <td>${statusBadge[p.status]||p.status}</td>
+                <td>${customer}</td>
+                <td style="font-family:monospace;font-size:10px;">${(p.license_key||'-').substring(0,16)}</td>
+                <td>${created}</td>
+                <td>
+                    ${p.status==='pending' ? `<button class="btn btn-sm" onclick="updatePurchaseStatus('${p.id}','paid')" style="color:var(--green);">✓ 标记已付</button>
+                    <button class="btn btn-sm" onclick="updatePurchaseStatus('${p.id}','cancelled')" style="color:#f85149;">✗ 取消</button>` :
+                    p.status==='paid' ? `<button class="btn btn-sm" onclick="updatePurchaseStatus('${p.id}','refunded')" style="color:#f85149;">↩ 退款</button>` : '-'}
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">暂无记录</td></tr>';
+    } catch(e) {
+        document.getElementById('purchase-table-body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#f85149;padding:20px;">加载失败</td></tr>';
+    }
+}
+
+async function updatePurchaseStatus(id, status) {
+    const labels = {paid:'标记为已支付', cancelled:'取消订单', refunded:'退款'};
+    if (!confirm(`确定${labels[status]}？`)) return;
+    await adminFetch('/api/admin/purchases/'+id+'/status', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status })
+    });
+    loadFinanceData();
+}
+
+// ===== 收款配置 =====
+async function loadPaymentConfig() {
+    try {
+        const cfg = await (await adminFetch('/api/admin/payment-config')).json();
+        document.getElementById('bank-name').value = cfg.bank_name || '';
+        document.getElementById('bank-account').value = cfg.bank_account || '';
+        document.getElementById('bank-holder').value = cfg.bank_holder || '';
+        document.getElementById('wechat-qr').value = cfg.wechat_qr || '';
+        document.getElementById('alipay-qr').value = cfg.alipay_qr || '';
+        showQrPreview('wechat-qr-preview', cfg.wechat_qr);
+        showQrPreview('alipay-qr-preview', cfg.alipay_qr);
+    } catch(e) { console.error(e); }
+}
+
+function showQrPreview(imgId, src) {
+    const img = document.getElementById(imgId);
+    if (src) { img.src = src; img.style.display = 'block'; }
+    else { img.style.display = 'none'; }
+}
+
+document.getElementById('wechat-qr').addEventListener('input', function() { showQrPreview('wechat-qr-preview', this.value); });
+document.getElementById('alipay-qr').addEventListener('input', function() { showQrPreview('alipay-qr-preview', this.value); });
+
+async function savePaymentConfig() {
+    const msg = document.getElementById('payment-save-msg');
+    try {
+        const resp = await adminFetch('/api/admin/payment-config', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                bank_name: document.getElementById('bank-name').value.trim(),
+                bank_account: document.getElementById('bank-account').value.trim(),
+                bank_holder: document.getElementById('bank-holder').value.trim(),
+                wechat_qr: document.getElementById('wechat-qr').value.trim(),
+                alipay_qr: document.getElementById('alipay-qr').value.trim(),
+            })
+        });
+        if ((await resp.json()).success) {
+            msg.innerHTML = '<span style="color:var(--green);">✅ 已保存</span>';
+        }
+    } catch(e) {
+        msg.innerHTML = '<span style="color:#f85149;">❌ 保存失败</span>';
+    }
+}
+
+// ===== 联系方式 =====
+async function loadContactConfig() {
+    try {
+        const cfg = await (await adminFetch('/api/admin/contact-config')).json();
+        document.getElementById('contact-wechat').value = cfg.wechat_id || '';
+        document.getElementById('contact-email').value = cfg.email || '';
+        document.getElementById('contact-phone').value = cfg.phone || '';
+        document.getElementById('contact-note').value = cfg.note || '';
+    } catch(e) { console.error(e); }
+}
+
+async function saveContactConfig() {
+    const msg = document.getElementById('contact-save-msg');
+    try {
+        const resp = await adminFetch('/api/admin/contact-config', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                contact_wechat: document.getElementById('contact-wechat').value.trim(),
+                contact_email: document.getElementById('contact-email').value.trim(),
+                contact_phone: document.getElementById('contact-phone').value.trim(),
+                contact_note: document.getElementById('contact-note').value.trim(),
+            })
+        });
+        if ((await resp.json()).success) {
+            msg.innerHTML = '<span style="color:var(--green);">✅ 已保存</span>';
+        }
+    } catch(e) {
+        msg.innerHTML = '<span style="color:#f85149;">❌ 保存失败</span>';
+    }
+}
+
+// ===== 客户管理 =====
+let _customerDetailId = null;
+
+async function loadCustomers() {
+    try {
+        const customers = await (await adminFetch('/api/admin/customers')).json();
+        // Summary stats
+        const totalSpend = customers.reduce((s,c) => s + (c.total_purchases||0), 0);
+        document.getElementById('customer-stats').innerHTML =
+            `<div class="stat-card accent"><div class="stat-value">${customers.length}</div><div class="stat-label">客户总数</div></div>`+
+            `<div class="stat-card green"><div class="stat-value">¥${totalSpend.toFixed(2)}</div><div class="stat-label">累计消费总额</div></div>`+
+            `<div class="stat-card"><div class="stat-value">${customers.reduce((s,c)=>s+(c.total_projects||0),0)}</div><div class="stat-label">总项目数</div></div>`+
+            `<div class="stat-card yellow"><div class="stat-value">${customers.reduce((s,c)=>s+(c.total_ai_calls||0),0)}</div><div class="stat-label">总AI调用</div></div>`;
+
+        document.getElementById('customer-table-body').innerHTML = customers.map(c => {
+            const lastActive = c.last_active_at ? new Date(c.last_active_at).toLocaleDateString('zh-CN') : '-';
+            return `<tr>
+                <td>${c.name || '-'}</td>
+                <td>${c.email || '-'}</td>
+                <td>${c.phone || '-'}</td>
+                <td style="font-weight:600;">¥${(c.total_purchases||0).toFixed(2)}</td>
+                <td>${c.total_projects||0}</td>
+                <td>${c.total_ai_calls||0}</td>
+                <td>${lastActive}</td>
+                <td><button class="btn btn-sm btn-ghost" onclick="showCustomerDetail('${c.id}')">📋 详情</button></td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">暂无客户记录</td></tr>';
+    } catch(e) {
+        document.getElementById('customer-table-body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#f85149;padding:20px;">加载失败</td></tr>';
+    }
+}
+
+async function showCustomerDetail(id) {
+    try {
+        const resp = await (await adminFetch('/api/admin/customers/'+encodeURIComponent(id))).json();
+        const c = resp.profile || resp;
+        _customerDetailId = id;
+        document.getElementById('customer-detail-title').textContent = '客户详情 — ' + (c.name || c.email || id);
+        document.getElementById('cust-name').value = c.name || '';
+        document.getElementById('cust-email').value = c.email || '';
+        document.getElementById('cust-phone').value = c.phone || '';
+        document.getElementById('cust-spend').value = '¥' + (c.total_purchases||0).toFixed(2);
+        document.getElementById('cust-projects').value = c.total_projects||0;
+        document.getElementById('cust-ai-calls').value = c.total_ai_calls||0;
+        document.getElementById('cust-notes').value = c.notes || '';
+        document.getElementById('customer-detail').style.display = 'block';
+        document.getElementById('customer-detail').scrollIntoView({behavior:'smooth'});
+    } catch(e) {
+        alert('加载客户详情失败: ' + e.message);
+    }
+}
+
+async function saveCustomerDetail() {
+    if (!_customerDetailId) return;
+    const msg = document.getElementById('cust-save-msg');
+    try {
+        const resp = await adminFetch('/api/admin/customers/'+encodeURIComponent(_customerDetailId), {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                name: document.getElementById('cust-name').value.trim(),
+                email: document.getElementById('cust-email').value.trim(),
+                phone: document.getElementById('cust-phone').value.trim(),
+                notes: document.getElementById('cust-notes').value.trim(),
+            })
+        });
+        if ((await resp.json()).success) {
+            msg.innerHTML = '<span style="color:var(--green);">✅ 已保存</span>';
+            loadCustomers();
+        }
+    } catch(e) {
+        msg.innerHTML = '<span style="color:#f85149;">❌ 保存失败</span>';
+    }
+}
+
+// ===== 资金流水管理 =====
+const accountTypeNames = {deposit:'充值',withdrawal:'提现',refund:'退款',adjustment:'调账'};
+const accountStatusBadges = {completed:'<span class="badge badge-active">已完成</span>',pending:'<span class="badge badge-pending">待处理</span>',cancelled:'<span class="badge badge-cancelled">已取消</span>'};
+
+async function loadPlatformAccounts() {
+    try {
+        const accounts = await (await adminFetch('/api/admin/platform-accounts')).json();
+        // Stats
+        const totalDeposit = accounts.filter(a=>a.type==='deposit'&&a.status==='completed').reduce((s,a)=>s+(a.amount||0),0);
+        const totalWithdrawal = accounts.filter(a=>a.type==='withdrawal'&&a.status==='completed').reduce((s,a)=>s+(a.amount||0),0);
+        const totalRefund = accounts.filter(a=>a.type==='refund'&&a.status==='completed').reduce((s,a)=>s+(a.amount||0),0);
+        const pendingAmount = accounts.filter(a=>a.status==='pending').reduce((s,a)=>s+(a.amount||0),0);
+
+        document.getElementById('account-stats').innerHTML =
+            `<div class="stat-card green"><div class="stat-value">¥${totalDeposit.toFixed(2)}</div><div class="stat-label">充值总额</div></div>`+
+            `<div class="stat-card"><div class="stat-value">¥${totalWithdrawal.toFixed(2)}</div><div class="stat-label">提现总额</div></div>`+
+            `<div class="stat-card" style="--stat-color:#f85149;"><div class="stat-value" style="color:#f85149;">¥${totalRefund.toFixed(2)}</div><div class="stat-label">退款总额</div></div>`+
+            `<div class="stat-card yellow"><div class="stat-value">¥${pendingAmount.toFixed(2)}</div><div class="stat-label">待处理金额</div></div>`+
+            `<div class="stat-card accent"><div class="stat-value">¥${(totalDeposit-totalWithdrawal-totalRefund).toFixed(2)}</div><div class="stat-label">平台余额</div></div>`;
+
+        document.getElementById('account-table-body').innerHTML = accounts.map(a => {
+            const created = a.created_at ? new Date(a.created_at).toLocaleString('zh-CN') : '-';
+            return `<tr>
+                <td style="font-family:monospace;font-size:10px;">${(a.id||'').substring(0,14)}...</td>
+                <td>${accountTypeNames[a.type]||a.type}</td>
+                <td style="font-weight:600;color:${a.type==='deposit'?'var(--green)':a.type==='withdrawal'?'#f85149':'var(--yellow)'};">${a.type==='deposit'?'+':'-'}¥${(a.amount||0).toFixed(2)}</td>
+                <td>${a.source || a.reference_id || '-'}</td>
+                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.note||''}">${a.note||'-'}</td>
+                <td>${accountStatusBadges[a.status]||a.status}</td>
+                <td>${created}</td>
+                <td>
+                    ${a.status==='pending' ? `<button class="btn btn-sm" onclick="updateAccountStatus('${a.id}','completed')" style="color:var(--green);">✓ 完成</button><button class="btn btn-sm" onclick="updateAccountStatus('${a.id}','cancelled')" style="color:#f85149;">✗ 取消</button>` : '-'}
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">暂无记录</td></tr>';
+    } catch(e) {
+        document.getElementById('account-table-body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#f85149;padding:20px;">加载失败</td></tr>';
+    }
+}
+
+async function createAccountRecord() {
+    const type = document.getElementById('acc-type').value;
+    const amount = parseFloat(document.getElementById('acc-amount').value);
+    const email = document.getElementById('acc-email').value.trim();
+    const desc = document.getElementById('acc-desc').value.trim();
+    const msg = document.getElementById('acc-save-msg');
+
+    if (!amount || amount <= 0) { msg.innerHTML = '<span style="color:#f85149;">请输入有效金额</span>'; return; }
+
+    try {
+        const resp = await adminFetch('/api/admin/platform-accounts', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ type, amount, source: email || 'manual', note: desc })
+        });
+        const data = await resp.json();
+        if (data.success || data.id) {
+            msg.innerHTML = '<span style="color:var(--green);">✅ 已记录</span>';
+            document.getElementById('acc-amount').value = '';
+            document.getElementById('acc-desc').value = '';
+            loadPlatformAccounts();
+        } else {
+            msg.innerHTML = '<span style="color:#f85149;">❌ '+(data.error||'失败')+'</span>';
+        }
+    } catch(e) {
+        msg.innerHTML = '<span style="color:#f85149;">❌ 保存失败</span>';
+    }
+}
+
+async function updateAccountStatus(id, status) {
+    const labels = {completed:'标记为已完成',cancelled:'取消该记录'};
+    if (!confirm(`确定${labels[status]}？`)) return;
+    try {
+        await adminFetch('/api/admin/platform-accounts/'+encodeURIComponent(id), {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status })
+        });
+        loadPlatformAccounts();
+    } catch(e) { alert('操作失败: '+e.message); }
+}
+
+// ===== QR 码文件上传 =====
+function previewQrFile(fileInputId, previewImgId, textareaId) {
+    const file = document.getElementById(fileInputId).files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById(previewImgId).src = e.target.result;
+        document.getElementById(previewImgId).style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function uploadQrFile(fileInputId, textareaId) {
+    const fileInput = document.getElementById(fileInputId);
+    const file = fileInput.files[0];
+    const isWechat = fileInputId === 'wechat-qr-file';
+    const qrType = isWechat ? 'wechat' : 'alipay';
+    const msgId = isWechat ? 'wechat-upload-msg' : 'alipay-upload-msg';
+    const msg = document.getElementById(msgId);
+
+    if (!file) {
+        msg.innerHTML = '<span style="color:var(--yellow);">未选择文件，请手动保存收款配置</span>';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', qrType);
+
+    msg.innerHTML = '<span style="color:var(--yellow);">上传中...</span>';
+    try {
+        const resp = await adminFetch('/api/admin/upload-qr', {
+            method:'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.url) {
+            document.getElementById(textareaId).value = data.url;
+            msg.innerHTML = '<span style="color:var(--green);">✅ 上传成功</span>';
+        } else {
+            msg.innerHTML = '<span style="color:#f85149;">❌ '+(data.error||'上传失败')+'</span>';
+        }
+    } catch(e) {
+        msg.innerHTML = '<span style="color:#f85149;">❌ 上传失败: '+e.message+'</span>';
+    }
+}
+</script>
+<script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+</body>
+</html>

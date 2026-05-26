@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>用户反馈 - Novel Studio</title>
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Novel Studio">
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0a0a0f; color: #f5f5f7; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+        .container { max-width:480px; width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:32px; }
+        h1 { font-size:22px; margin-bottom:8px; }
+        p.sub { color:#8e8e93; font-size:13px; margin-bottom:20px; }
+        .form-group { margin-bottom:16px; }
+        label { font-size:12px; font-weight:600; color:#98989d; display:block; margin-bottom:4px; }
+        input, select, textarea { width:100%; padding:10px 12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.08); border-radius:8px; color:#f5f5f7; font-size:13px; font-family:inherit; }
+        textarea { resize:vertical; min-height:80px; }
+        .btn { padding:10px 28px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
+        .btn-primary { background:#0A84FF; color:#fff; width:100%; }
+        .btn-primary:hover { background:#409cff; }
+        .success { display:none; text-align:center; padding:32px 0; }
+        .success .icon { font-size:48px; margin-bottom:12px; }
+        .success h2 { font-size:20px; margin-bottom:8px; }
+        .success p { color:#8e8e93; font-size:13px; }
+        .stars { display:flex; gap:8px; margin-bottom:16px; }
+        .star { font-size:28px; cursor:pointer; transition:transform 0.15s; color:#55555a; }
+        .star:hover { transform:scale(1.2); }
+        .star.active { color:#ffd60a; }
+    </style>
+</head>
+<body>
+<div class="container" id="form-container">
+    <h1>💬 用户反馈</h1>
+    <p class="sub">你的意见帮助我们做得更好</p>
+    <form id="feedback-form">
+        <div class="form-group">
+            <label>整体评分</label>
+            <div class="stars" id="star-rating">
+                <span class="star" data-rating="1">★</span>
+                <span class="star" data-rating="2">★</span>
+                <span class="star" data-rating="3">★</span>
+                <span class="star" data-rating="4">★</span>
+                <span class="star" data-rating="5">★</span>
+            </div>
+            <input type="hidden" name="rating" id="rating-value" value="0">
+        </div>
+        <div class="form-group">
+            <label>反馈类型</label>
+            <select name="type" id="feedback-type">
+                <option value="feature">功能建议</option>
+                <option value="bug">问题反馈</option>
+                <option value="praise">好评</option>
+                <option value="other">其他</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>详细描述</label>
+            <textarea name="content" id="feedback-content" placeholder="请详细描述你的想法..."></textarea>
+        </div>
+        <div class="form-group">
+            <label>联系方式（选填，方便我们回复）</label>
+            <input type="text" name="contact" id="feedback-contact" placeholder="微信 / 邮箱">
+        </div>
+        <button type="submit" class="btn btn-primary">提交反馈</button>
+    </form>
+</div>
+<div class="success" id="success-container">
+    <div class="icon">🎉</div>
+    <h2>感谢你的反馈！</h2>
+    <p>我们会认真对待每一条意见</p>
+</div>
+
+<script>
+let _rating = 0;
+document.querySelectorAll('.star').forEach(star => {
+    star.addEventListener('click', function() {
+        _rating = parseInt(this.dataset.rating);
+        document.getElementById('rating-value').value = _rating;
+        document.querySelectorAll('.star').forEach(s => {
+            s.classList.toggle('active', parseInt(s.dataset.rating) <= _rating);
+        });
+    });
+});
+
+document.getElementById('feedback-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const data = {
+        rating: _rating,
+        type: document.getElementById('feedback-type').value,
+        content: document.getElementById('feedback-content').value,
+        contact: document.getElementById('feedback-contact').value
+    };
+    if (!data.content.trim()) { alert('请填写反馈内容'); return; }
+    try {
+        await fetch('/api/feedback', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(data)
+        });
+        document.getElementById('form-container').style.display = 'none';
+        document.getElementById('success-container').style.display = 'block';
+    } catch(e) {
+        alert('提交失败，请稍后再试');
+    }
+});
+</script>
+<script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+</body>
+</html>

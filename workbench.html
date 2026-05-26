@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novel Forge — 工业级AI网文生产线工作台</title>
+<style>
+:root {
+  --bg-root: #0d0d12;
+  --bg-panel: #141419;
+  --bg-surface: #1a1a21;
+  --bg-input: #1e1e28;
+  --bg-hover: #22222e;
+  --border: #252530;
+  --border-active: #3a3a4a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6a6a7a;
+  --accent: #5e8af0;
+  --accent-glow: rgba(94,138,240,0.15);
+  --green: #34c759;
+  --green-glow: rgba(52,199,89,0.12);
+  --orange: #f59e0b;
+  --orange-glow: rgba(245,158,11,0.12);
+  --red: #f85149;
+  --red-glow: rgba(248,81,73,0.15);
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+  --font-mono: 'SF Mono','JetBrains Mono','Fira Code',monospace;
+  --font-sans: -apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Microsoft YaHei',sans-serif;
+  --radius: 6px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:var(--font-sans);
+  background:var(--bg-root);
+  color:var(--text-primary);
+  height:100vh;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.app{display:flex;height:100vh;}
+
+/* ===== LEFT COLUMN ===== */
+.panel-left{
+  width:20%;min-width:260px;max-width:340px;
+  background:var(--bg-panel);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.panel-left-header{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+  flex-shrink:0;
+}
+.brand-icon{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:800;
+}
+.brand-text{font-weight:700;font-size:14px;letter-spacing:0.5px;}
+.brand-sub{font-size:10px;color:var(--text-muted);margin-top:1px;}
+
+/* Story Tree */
+.tree-section{
+  flex:1;overflow-y:auto;padding:8px 0;
+}
+.tree-section::-webkit-scrollbar{width:4px;}
+.tree-section::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+.tree-node{padding-left:12px;user-select:none;}
+.tree-row{
+  display:flex;align-items:center;gap:4px;
+  padding:5px 8px;margin:1px 0;border-radius:4px;
+  cursor:pointer;transition:var(--transition);
+  font-size:12.5px;color:var(--text-secondary);
+}
+.tree-row:hover{background:var(--bg-hover);}
+.tree-row.active{background:var(--accent-glow);color:var(--accent);}
+.tree-row .arrow{
+  width:14px;font-size:9px;color:var(--text-muted);
+  flex-shrink:0;text-align:center;transition:transform 0.15s;
+}
+.tree-row .arrow.expanded{transform:rotate(90deg);}
+.tree-row .icon{font-size:12px;flex-shrink:0;}
+.tree-row .label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tree-row .badge{
+  font-size:10px;padding:1px 6px;border-radius:8px;
+  background:var(--bg-input);color:var(--text-muted);
+  flex-shrink:0;
+}
+.tree-row .badge.ai{background:rgba(94,138,240,0.15);color:var(--accent);}
+.tree-row .badge.wip{background:rgba(245,158,11,0.12);color:var(--orange);}
+.tree-children{overflow:hidden;transition:max-height 0.25s ease;}
+.tree-children.collapsed{max-height:0!important;}
+
+/* Scene cards under chapters */
+.scene-card{
+  display:flex;align-items:center;gap:6px;
+  padding:3px 8px 3px 28px;margin:1px 0;
+  font-size:11px;color:var(--text-muted);
+  cursor:pointer;border-radius:3px;
+}
+.scene-card:hover{background:var(--bg-hover);color:var(--text-secondary);}
+.scene-card .sc-phase{
+  width:16px;height:16px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;flex-shrink:0;
+}
+.sc-phase.qi{background:rgba(52,199,89,0.15);color:var(--green);}
+.sc-phase.cheng{background:rgba(245,158,11,0.15);color:var(--orange);}
+.sc-phase.zhuan{background:rgba(94,138,240,0.15);color:var(--accent);}
+.sc-phase.he{background:rgba(167,139,250,0.15);color:var(--purple);}
+
+/* Lore Monitor */
+.lore-section{
+  border-top:1px solid var(--border);
+  background:var(--bg-surface);
+  flex-shrink:0;
+  max-height:35%;overflow-y:auto;
+}
+.lore-section::-webkit-scrollbar{width:4px;}
+.lore-section::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.lore-header{
+  padding:10px 16px;font-size:11px;font-weight:600;
+  color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:1px;display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:var(--bg-surface);z-index:1;
+}
+.char-chip{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 12px;margin:3px 8px;
+  border-radius:4px;font-size:11px;
+  cursor:pointer;transition:var(--transition);
+  border-left:2px solid transparent;
+}
+.char-chip:hover{background:var(--bg-hover);}
+.char-chip.active{border-left-color:var(--accent);}
+.char-chip .avatar{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;flex-shrink:0;
+}
+.char-chip .char-info{flex:1;min-width:0;}
+.char-chip .char-name{font-size:11.5px;color:var(--text-primary);}
+.char-chip .char-role{font-size:10px;color:var(--text-muted);}
+.char-chip .char-status{
+  font-size:9px;padding:1px 6px;border-radius:6px;
+  flex-shrink:0;
+}
+.status-alive{background:rgba(52,199,89,0.12);color:var(--green);}
+.status-injured{background:rgba(245,158,11,0.12);color:var(--orange);}
+.status-dead{background:rgba(248,81,73,0.12);color:var(--red);}
+.status-unknown{background:var(--bg-input);color:var(--text-muted);}
+
+.rule-item{
+  padding:5px 12px;margin:2px 8px;
+  font-size:10.5px;color:var(--text-muted);
+  border-radius:3px;display:flex;align-items:center;gap:6px;
+}
+.rule-item .rule-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--purple);flex-shrink:0;
+}
+
+/* ===== MIDDLE COLUMN ===== */
+.panel-center{
+  flex:1;display:flex;flex-direction:column;
+  min-width:0;background:var(--bg-root);
+}
+
+/* Control Console */
+.control-console{
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;
+  gap:12px;flex-wrap:wrap;flex-shrink:0;
+}
+.ctrl-group{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px;background:var(--bg-surface);
+  border-radius:var(--radius);border:1px solid var(--border);
+}
+.ctrl-label{
+  font-size:10px;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:0.5px;
+  white-space:nowrap;
+}
+.ctrl-toggle{
+  position:relative;width:36px;height:20px;
+  background:var(--bg-input);border-radius:10px;
+  cursor:pointer;transition:var(--transition);
+  border:1px solid var(--border);flex-shrink:0;
+}
+.ctrl-toggle.on{background:var(--green);border-color:var(--green);}
+.ctrl-toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:14px;height:14px;background:#fff;
+  border-radius:50%;transition:transform 0.2s ease;
+}
+.ctrl-toggle.on::after{transform:translateX(16px);}
+.ctrl-toggle.warn{background:var(--orange);border-color:var(--orange);}
+.ctrl-toggle.warn::after{transform:translateX(16px);}
+
+.ctrl-select{
+  padding:3px 6px;background:var(--bg-input);color:var(--text-primary);
+  border:1px solid var(--border);border-radius:3px;
+  font-size:10.5px;cursor:pointer;font-family:var(--font-sans);
+  outline:none;
+}
+.ctrl-select:focus{border-color:var(--accent);}
+
+.ctrl-indicator{
+  display:flex;align-items:center;gap:4px;
+  font-size:10px;padding:3px 8px;border-radius:10px;
+}
+.ctrl-indicator.active{background:var(--green-glow);color:var(--green);}
+.ctrl-indicator.off{background:var(--bg-input);color:var(--text-muted);}
+.ctrl-dot{width:6px;height:6px;border-radius:50%;}
+.ctrl-indicator.active .ctrl-dot{background:var(--green);}
+.ctrl-indicator.off .ctrl-dot{background:var(--text-muted);}
+
+.ctrl-sep{width:1px;height:20px;background:var(--border);margin:0 4px;}
+
+/* Editor Area */
+.editor-wrap{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+.editor-toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 16px;background:var(--bg-panel);
+  border-bottom:1px solid var(--border);
+}
+.editor-toolbar .ch-title{
+  flex:1;font-size:13px;font-weight:600;
+  color:var(--text-primary);
+}
+.editor-toolbar .ch-meta{
+  font-size:11px;color:var(--text-muted);
+  display:flex;align-items:center;gap:8px;
+}
+.editor-toolbar .wc{
+  padding:2px 8px;background:var(--bg-input);
+  border-radius:8px;font-size:10px;
+}
+.editor-body{
+  flex:1;overflow-y:auto;padding:24px 40px;
+  font-size:16px;line-height:2;color:var(--text-primary);
+  letter-spacing:0.3px;background:var(--bg-root);
+  outline:none;border:none;resize:none;
+  font-family:var(--font-sans);
+}
+.editor-body::-webkit-scrollbar{width:6px;}
+.editor-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.editor-body:empty::before{
+  content:'开始创作...\A\A 快捷键：Ctrl+Enter · AI 续写  |  Ctrl+/ · 召唤指令面板  |  选中文本 · 右键触发内联菜单';
+  color:var(--text-muted);white-space:pre;pointer-events:none;
+}
+.editor-body:focus{outline:none;}
+
+/* Inline context menu */
+.inline-menu{
+  position:absolute;display:none;
+  background:var(--bg-surface);border:1px solid var(--border-active);
+  border-radius:var(--radius);padding:4px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  z-index:100;min-width:180px;
+}
+.inline-menu.show{display:block;}
+.inline-menu button{
+  display:block;width:100%;text-align:left;
+  padding:7px 12px;border:none;background:none;
+  color:var(--text-secondary);font-size:12px;
+  cursor:pointer;border-radius:3px;font-family:var(--font-sans);
+}
+.inline-menu button:hover{background:var(--bg-hover);color:var(--text-primary);}
+.inline-menu button .shortcut{
+  float:right;color:var(--text-muted);font-size:10px;
+}
+
+/* Bottom status bar */
+.editor-status{
+  display:flex;align-items:center;gap:16px;
+  padding:5px 16px;background:var(--accent);
+  border-top:1px solid var(--border);
+  font-size:10px;color:var(--text-muted);
+  flex-shrink:0;
+}
+.editor-status .st-item{padding:2px 8px;background:var(--bg-input);border-radius:6px;}
+
+/* ===== RIGHT COLUMN ===== */
+.panel-right{
+  width:25%;min-width:280px;max-width:380px;
+  background:var(--bg-panel);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow-y:auto;padding:12px;
+  gap:12px;
+}
+.panel-right::-webkit-scrollbar{width:4px;}
+.panel-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+.metric-card{
+  background:var(--bg-surface);
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  padding:14px;
+}
+.metric-card.alert{border-color:rgba(248,81,73,0.3);}
+.metric-card.warn{border-color:rgba(245,158,11,0.2);}
+.metric-card.good{border-color:rgba(52,199,89,0.2);}
+
+.metric-header{
+  display:flex;align-items:center;gap:6px;
+  margin-bottom:10px;
+}
+.metric-header .m-icon{font-size:14px;}
+.metric-header .m-title{font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;}
+.metric-header .m-status{
+  margin-left:auto;font-size:10px;padding:2px 8px;border-radius:8px;
+}
+
+/* POV Alert */
+.pov-indicator{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:4px;
+  margin-bottom:8px;
+}
+.pov-indicator.clean{background:var(--green-glow);}
+.pov-indicator.violated{background:var(--red-glow);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.7;}}
+.pov-count{font-size:24px;font-weight:700;}
+.pov-count.clean{color:var(--green);}
+.pov-count.violated{color:var(--red);}
+.pov-detail{font-size:10px;color:var(--text-muted);}
+.pov-detail .highlight{color:var(--red);font-weight:600;}
+
+/* Rhythm chart */
+.rhythm-chart{
+  display:flex;align-items:flex-end;gap:3px;
+  height:80px;padding:4px 0;
+}
+.rhythm-bar{
+  flex:1;border-radius:2px 2px 0 0;
+  transition:height 0.4s ease;
+  min-width:6px;
+}
+.rhythm-legend{
+  display:flex;gap:12px;margin-top:8px;
+  font-size:10px;color:var(--text-muted);
+}
+.rhythm-legend span{display:flex;align-items:center;gap:4px;}
+.rhythm-leg-dot{width:8px;height:8px;border-radius:2px;}
+
+/* Retention forecast */
+.retention-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:6px;margin-top:4px;
+}
+.retention-cell{
+  text-align:center;padding:8px 4px;
+  background:var(--bg-input);border-radius:4px;
+}
+.retention-cell .r-day{font-size:9px;color:var(--text-muted);margin-bottom:2px;}
+.retention-cell .r-pct{font-size:16px;font-weight:700;}
+.retention-cell .r-delta{font-size:9px;}
+.r-pct.good{color:var(--green);}
+.r-pct.warn{color:var(--orange);}
+.r-pct.bad{color:var(--red);}
+.r-delta.up{color:var(--green);}
+.r-delta.down{color:var(--red);}
+
+/* Hook completion bar */
+.hook-bar-wrap{
+  background:var(--bg-input);height:6px;border-radius:3px;
+  margin-top:4px;overflow:hidden;
+}
+.hook-bar-fill{
+  height:100%;border-radius:3px;transition:width 0.6s ease;
+}
+
+/* Filter badge */
+.filter-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:9px;padding:2px 8px;border-radius:8px;
+  background:rgba(245,158,11,0.1);color:var(--orange);
+  border:1px solid rgba(245,158,11,0.2);
+}
+.filter-badge.blocked{
+  background:rgba(248,81,73,0.1);color:var(--red);
+  border-color:rgba(248,81,73,0.2);
+  text-decoration:line-through;
+}
+
+/* AI injection preview */
+.ai-inject-bar{
+  padding:6px 12px;background:var(--accent-glow);
+  border-left:3px solid var(--accent);
+  font-size:11px;color:var(--text-secondary);
+  margin-top:8px;border-radius:0 4px 4px 0;
+  display:none;
+}
+.ai-inject-bar.show{display:block;}
+
+/* Platform preset badges */
+.platform-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:3px 8px;border-radius:10px;
+  font-size:10px;background:var(--bg-input);
+  color:var(--text-secondary);cursor:pointer;
+  border:1px solid transparent;transition:var(--transition);
+}
+.platform-badge:hover{border-color:var(--border-active);}
+.platform-badge.selected{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);}
+
+/* chapter status dot */
+.ch-status{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+}
+.ch-status.draft{background:var(--text-muted);}
+.ch-status.writing{background:var(--orange);}
+.ch-status.done{background:var(--green);}
+.ch-status.locked{background:var(--accent);}
+
+/* Responsive - stack on narrow */
+@media(max-width:1100px){
+  .panel-right{display:none;}
+  .panel-left{width:240px;min-width:240px;}
+}
+@media(max-width:700px){
+  .panel-left{display:none;}
+  .control-console{flex-wrap:wrap;gap:6px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ========== LEFT COLUMN ========== -->
+<div class="panel-left">
+  <div class="panel-left-header">
+    <div class="brand-icon">NF</div>
+    <div>
+      <div class="brand-text">Novel Forge</div>
+      <div class="brand-sub">工业级 · 生产线</div>
+    </div>
+  </div>
+
+  <!-- Story Tree -->
+  <div class="tree-section" id="story-tree">
+
+    <!-- 第一卷 -->
+    <div class="tree-node">
+      <div class="tree-row active" onclick="toggleTreeNode(this,'vol1')">
+        <span class="arrow expanded" id="arrow-vol1">▶</span>
+        <span class="icon">📦</span>
+        <span class="label">第一卷 · 废土求生</span>
+        <span class="badge">4章</span>
+      </div>
+      <div class="tree-children" id="children-vol1" style="max-height:600px;">
+
+        <!-- 第1章 -->
+        <div class="tree-node" style="padding-left:8px;">
+          <div class="tree-row active" onclick="toggleTreeNode(this,'ch1')" style="font-size:12px;">
+            <span class="arrow expanded" id="arrow-ch1">▶</span>
+            <span class="icon">📄</span>
+            <span class="label">第1章 · 辐射区醒来</span>
+            <span class="ch-status done"></span>
+          </div>
+          <div class="tree-children" id="children-ch1" style="max-height:300px;">
+            <div class="scene-card" onclick="selectScene(this,'ch1-qi')">
+              <span class="sc-phase qi">起</span>
+              <span>辐射区醒来 · 失忆开局</span>
+            </div>
+            <div class="scene-card" onclick="selectScene(this,'ch1-cheng')">
+              <span class="sc-phase cheng">承</span>
+              <span>发现避难所 · 资源检索</span>
+            </div>
+            <div class="scene-card active" onclick="selectScene(this,'ch1-zhuan')">
+              <span class="sc-phase zhuan">转</span>
+              <span>遭遇变异体 · 智取逃脱</span>
+            </div>
+            <div class="scene-card" onclick="selectScene(this,'ch1-he')">
+              <span class="sc-phase he">合</span>
+              <span>钩子：地下基地信号</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第2章 -->
+        <div class="tree-node" style="padding-left:8px;">
+          <div class="tree-row" onclick="toggleTreeNode(this,'ch2')" style="font-size:12px;">
+            <span class="arrow" id="arrow-ch2">▶</span>
+            <span class="icon">📄</span>
+            <span class="label">第2章 · 地下基地</span>
+            <span class="ch-status writing"></span>
+          </div>
+          <div class="tree-children collapsed" id="children-ch2" style="max-height:0px;">
+            <div class="scene-card"><span class="sc-phase qi">起</span><span>基地入口 · 身份验证</span></div>
+            <div class="scene-card"><span class="sc-phase cheng">承</span><span>AI系统的条件交换</span></div>
+            <div class="scene-card"><span class="sc-phase zhuan">转</span><span>发现实验记录</span></div>
+            <div class="scene-card"><span class="sc-phase he">合</span><span>钩子：外部追踪者</span></div>
+          </div>
+        </div>
+
+        <!-- 第3-4章 collapsed -->
+        <div class="tree-node" style="padding-left:8px;">
+          <div class="tree-row" onclick="toggleTreeNode(this,'ch3')" style="font-size:12px;">
+            <span class="arrow" id="arrow-ch3">▶</span>
+            <span class="icon">📄</span>
+            <span class="label">第3章 · 共生契约</span>
+            <span class="badge ai">AI</span>
+          </div>
+          <div class="tree-children collapsed" id="children-ch3" style="max-height:0px;"></div>
+        </div>
+        <div class="tree-node" style="padding-left:8px;">
+          <div class="tree-row" onclick="toggleTreeNode(this,'ch4')" style="font-size:12px;">
+            <span class="arrow" id="arrow-ch4">▶</span>
+            <span class="icon">📄</span>
+            <span class="label">第4章 · 地表追踪者</span>
+            <span class="badge wip">草稿</span>
+          </div>
+          <div class="tree-children collapsed" id="children-ch4" style="max-height:0px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第二卷 -->
+    <div class="tree-node">
+      <div class="tree-row" onclick="toggleTreeNode(this,'vol2')">
+        <span class="arrow" id="arrow-vol2">▶</span>
+        <span class="icon">📦</span>
+        <span class="label">第二卷 · 新世界秩序</span>
+        <span class="badge">规划中</span>
+      </div>
+      <div class="tree-children collapsed" id="children-vol2" style="max-height:0px;"></div>
+    </div>
+  </div>
+
+  <!-- Lore Monitor -->
+  <div class="lore-section">
+    <div class="lore-header">📡 当前活跃角色</div>
+    <div class="char-chip active">
+      <div class="avatar" style="background:rgba(94,138,240,0.2);">🧑</div>
+      <div class="char-info">
+        <div class="char-name">林夜</div>
+        <div class="char-role">主角 · 前研究员</div>
+      </div>
+      <span class="char-status status-alive">存活</span>
+    </div>
+    <div class="char-chip">
+      <div class="avatar" style="background:rgba(167,139,250,0.2);">🤖</div>
+      <div class="char-info">
+        <div class="char-name">Ω-7</div>
+        <div class="char-role">AI系统 · 基地中枢</div>
+      </div>
+      <span class="char-status status-unknown">未知</span>
+    </div>
+    <div class="char-chip">
+      <div class="avatar" style="background:rgba(248,81,73,0.15);">👤</div>
+      <div class="char-info">
+        <div class="char-name">赵铁</div>
+        <div class="char-role">追踪者队长</div>
+      </div>
+      <span class="char-status status-alive">存活</span>
+    </div>
+
+    <div class="lore-header" style="margin-top:6px;">⚙️ 世界观约束规则</div>
+    <div class="rule-item"><span class="rule-dot"></span>辐射区：地表辐射值 >500μSv/h，普通人类裸暴露生存时间 <4h</div>
+    <div class="rule-item"><span class="rule-dot"></span>变异体：感知范围50m，听觉敏感，视觉退化</div>
+    <div class="rule-item"><span class="rule-dot"></span>Ω-7 限制：不可主动干预人类决策，须通过「共生契约」间接协作</div>
+    <div class="rule-item"><span class="rule-dot"></span>资源法则：每单位净水 = 3日生存筹码</div>
+  </div>
+</div>
+
+<!-- ========== MIDDLE COLUMN ========== -->
+<div class="panel-center">
+
+  <!-- Control Console -->
+  <div class="control-console">
+    <!-- POV Lock -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">POV锁定</span>
+      <div class="ctrl-toggle on" id="pov-toggle" onclick="togglePOV()" title="严格限制性视角：锁定主角感知范围"></div>
+      <span class="ctrl-indicator active" id="pov-indicator">
+        <span class="ctrl-dot"></span>严格限制
+      </span>
+    </div>
+
+    <span class="ctrl-sep"></span>
+
+    <!-- De-AI Filter -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">去AI味</span>
+      <select class="ctrl-select" id="deai-filter" onchange="applyDeaiFilter(this.value)">
+        <option value="off">关闭</option>
+        <option value="action" selected>动作驱动</option>
+        <option value="nocl">过滤套话</option>
+        <option value="baihua">大白话转换</option>
+      </select>
+      <span class="filter-badge" id="deai-badge">动作驱动</span>
+    </div>
+
+    <span class="ctrl-sep"></span>
+
+    <!-- Hook Engine -->
+    <div class="ctrl-group">
+      <span class="ctrl-label">留钩子</span>
+      <span class="platform-badge selected" onclick="selectPlatform(this,'fanqie')" style="cursor:pointer;">🍅 番茄验证期</span>
+      <span class="platform-badge" onclick="selectPlatform(this,'qidian')" style="cursor:pointer;">📚 起点追读</span>
+    </div>
+
+    <span class="ctrl-sep"></span>
+
+    <!-- Word count + chapter info -->
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <span class="wc">2,847 字</span>
+      <span style="font-size:10px;color:var(--text-muted);">目标 3,000</span>
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-wrap">
+    <div class="editor-toolbar">
+      <span class="ch-title">第1章 · 辐射区醒来</span>
+      <span class="ch-meta">
+        <span>当前场景: <b style="color:var(--accent);">转 · 遭遇变异体</b></span>
+        <span class="wc" style="background:var(--accent-glow);color:var(--accent);">POV: 林夜</span>
+      </span>
+    </div>
+
+    <div class="editor-body" id="editor" contenteditable="true">
+      林夜是被一阵刺痛唤醒的。
+      <br><br>
+      他睁开眼的瞬间，强烈的眩晕感几乎将他再次推入黑暗。视野所及，是一片灰褐色的废墟——扭曲的钢筋从混凝土块中斜刺出来，像某种巨型生物的骸骨。空气中弥漫着刺鼻的焦糊味，混合着金属锈蚀的腥气。
+      <br><br>
+      <em>这是哪儿？</em>
+      <br><br>
+      林夜试图撑起身体，右手碰到了什么东西——是一只破损的盖革计数器。屏幕已经碎裂，但指针仍在微弱颤动。读数让他瞳孔骤缩：<strong>523 μSv/h</strong>。
+      <br><br>
+      辐射区。他在辐射区。
+      <br><br>
+      记忆像碎片一样涌来：白色的实验室走廊、刺耳的警报、同事惊恐的面孔……然后是一片空白。他不知道自己是怎么来到这里的，也不知道过去了多久。唯一确定的是——如果不尽快找到庇护所，四小时内他就会死于急性辐射综合征。
+      <br><br>
+      林夜咬紧牙关，用颤抖的双腿站了起来。废墟向四面八方延伸，远处隐约可见一座低矮建筑，外墙覆盖着太阳能板，在灰暗的天空下反射出微弱的蓝光。
+      <br><br>
+      他刚迈出第一步，脚下的碎石发出细碎的响声。
+      <br><br>
+      三十米外，一堆瓦砾后传来了回应——一种不规则的、湿漉漉的爬行声。
+      <br><br>
+      林夜的血液凝固了。那个声音他不陌生：<strong>变异体</strong>。他在实验室的监控录像中见过它们。曾经是人类，如今是辐射塑造的捕食者。它们的视力退化，但听觉几乎可以捕捉到心跳。
+      <br><br>
+      爬行声停止了。取而代之的，是一阵缓慢的、试探性的嗅探。
+      <br><br>
+      它在定位。
+    </div>
+
+    <!-- Inline context menu -->
+    <div class="inline-menu" id="inline-menu">
+      <button onclick="inlineAction('expand')">📝 扩写动作细节 <span class="shortcut">Ctrl+E</span></button>
+      <button onclick="inlineAction('gap')">🔍 注入认知差/信息差 <span class="shortcut">Ctrl+G</span></button>
+      <button onclick="inlineAction('sensory')">👁 强化感官描写 <span class="shortcut">Ctrl+S</span></button>
+      <button onclick="inlineAction('hook')">🪝 此处埋钩子 <span class="shortcut">Ctrl+H</span></button>
+      <button onclick="inlineAction('deai')">🛡 去AI味重写 <span class="shortcut">Ctrl+D</span></button>
+    </div>
+
+    <!-- AI injection preview -->
+    <div class="ai-inject-bar" id="ai-inject-bar">
+      🤖 AI 续写建议：<span id="ai-inject-text">从变异体的视角描述它如何通过气味和声音追踪主角，增强压迫感…</span>
+      <button style="margin-left:8px;padding:2px 8px;font-size:10px;background:var(--accent);border:none;color:#fff;border-radius:3px;cursor:pointer;" onclick="acceptInject()">应用</button>
+      <button style="padding:2px 8px;font-size:10px;background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:3px;cursor:pointer;" onclick="dismissInject()">忽略</button>
+    </div>
+
+    <div class="editor-status">
+      <span class="st-item">📍 场景: 转</span>
+      <span class="st-item">⏱ 节奏: 紧张</span>
+      <span class="st-item" id="deai-count">🛡 过滤套话: 3处已标记</span>
+      <span class="st-item" style="margin-left:auto;">Ctrl+Enter 续写</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== RIGHT COLUMN ========== -->
+<div class="panel-right">
+
+  <!-- POV Violation Alert -->
+  <div class="metric-card alert" id="pov-alert-card">
+    <div class="metric-header">
+      <span class="m-icon">🚨</span>
+      <span class="m-title">视角越界检测</span>
+      <span class="m-status" id="pov-alert-status" style="background:var(--green-glow);color:var(--green);">安全</span>
+    </div>
+    <div class="pov-indicator clean" id="pov-indicator-box">
+      <div class="pov-count clean" id="pov-violation-count">0</div>
+      <div class="pov-detail">
+        当前越界次数<br>
+        本段限制性视角：<b>林夜</b>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+      POV 锁定：<span style="color:var(--green);">仅主角感知范围内叙述</span>
+    </div>
+    <div class="hook-bar-wrap"><div class="hook-bar-fill" style="width:100%;background:var(--green);"></div></div>
+  </div>
+
+  <!-- Conflict Density & Rhythm -->
+  <div class="metric-card good">
+    <div class="metric-header">
+      <span class="m-icon">📈</span>
+      <span class="m-title">冲突密度 / 节奏分析</span>
+      <span class="m-status" style="background:var(--green-glow);color:var(--green);">健康</span>
+    </div>
+    <div class="rhythm-chart" id="rhythm-chart">
+      <!-- Generated by JS -->
+    </div>
+    <div class="rhythm-legend">
+      <span><span class="rhythm-leg-dot" style="background:var(--red);"></span>冲突</span>
+      <span><span class="rhythm-leg-dot" style="background:var(--accent);"></span>悬念</span>
+      <span><span class="rhythm-leg-dot" style="background:var(--green);"></span>爽点</span>
+      <span><span class="rhythm-leg-dot" style="background:var(--orange);"></span>信息量</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--text-muted);">
+      <span>起</span><span>承</span><span>转</span><span>合</span>
+    </div>
+  </div>
+
+  <!-- Hook Completion -->
+  <div class="metric-card warn">
+    <div class="metric-header">
+      <span class="m-icon">🪝</span>
+      <span class="m-title">钩子完成度</span>
+    </div>
+    <div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+        <span>本章埋钩子</span><span style="color:var(--orange);">3 / 4 目标</span>
+      </div>
+      <div class="hook-bar-wrap"><div class="hook-bar-fill" style="width:75%;background:var(--orange);"></div></div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);">
+      ✅ 开局悬疑 · ✅ 中段转折 · ✅ 章末悬念<br>
+      ❌ 角色关系钩子 — <span style="color:var(--orange);">建议在 "合" 场景补充</span>
+    </div>
+  </div>
+
+  <!-- Platform Validation Simulator -->
+  <div class="metric-card">
+    <div class="metric-header">
+      <span class="m-icon">📊</span>
+      <span class="m-title">验证期留存预测</span>
+      <span class="m-status" style="background:var(--orange-glow);color:var(--orange);">番茄·新书期</span>
+    </div>
+    <div class="retention-grid">
+      <div class="retention-cell">
+        <div class="r-day">第1章读完率</div>
+        <div class="r-pct good">78%</div>
+        <div class="r-delta up">↑ 高于均值12%</div>
+      </div>
+      <div class="retention-cell">
+        <div class="r-day">第3章留存</div>
+        <div class="r-pct warn">52%</div>
+        <div class="r-delta down">↓ 接近流失红线</div>
+      </div>
+      <div class="retention-cell">
+        <div class="r-day">7日留存预估</div>
+        <div class="r-pct good">41%</div>
+        <div class="r-delta up">↑ 良好</div>
+      </div>
+      <div class="retention-cell">
+        <div class="r-day">8日追读率</div>
+        <div class="r-pct warn">33%</div>
+        <div class="r-delta down">↓ 需加强第3章钩子</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px;">
+      ⚠️ 预测分析：<span style="color:var(--orange);">第3章留存偏低</span>，建议在中段增加一个小爽点（如资源发现）来维持阅读动力
+    </div>
+  </div>
+
+  <!-- Cliché Blacklist -->
+  <div class="metric-card">
+    <div class="metric-header">
+      <span class="m-icon">🚫</span>
+      <span class="m-title">套话黑名单命中</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <span class="filter-badge blocked">倒吸一口凉气</span>
+      <span class="filter-badge blocked">瞳孔猛缩</span>
+      <span class="filter-badge blocked">嘴角勾起一抹弧度</span>
+      <span class="filter-badge">眼中闪过</span>
+      <span class="filter-badge">不愧是</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:8px;">
+      3 处命中 · 过滤套话模式已启用
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Context Menu -->
+<div class="inline-menu" id="context-menu"></div>
+
+<script>
+// ===== POV Toggle =====
+function togglePOV() {
+  const toggle = document.getElementById('pov-toggle');
+  const indicator = document.getElementById('pov-indicator');
+  const alertCard = document.getElementById('pov-alert-card');
+  const povBox = document.getElementById('pov-indicator-box');
+  const povCount = document.getElementById('pov-violation-count');
+  const povStatus = document.getElementById('pov-alert-status');
+
+  toggle.classList.toggle('on');
+
+  if (toggle.classList.contains('on')) {
+    indicator.className = 'ctrl-indicator active';
+    indicator.innerHTML = '<span class="ctrl-dot"></span>严格限制';
+    povBox.className = 'pov-indicator clean';
+    povCount.className = 'pov-count clean';
+    povCount.textContent = '0';
+    povStatus.style.background = 'var(--green-glow)';
+    povStatus.style.color = 'var(--green)';
+    povStatus.textContent = '安全';
+    alertCard.className = 'metric-card';
+    showToast('✅ POV 锁定已启用 — 仅主角感知范围内叙述');
+  } else {
+    indicator.className = 'ctrl-indicator off';
+    indicator.innerHTML = '<span class="ctrl-dot"></span>已关闭';
+    povBox.className = 'pov-indicator violated';
+    povCount.className = 'pov-count violated';
+    povCount.textContent = '3';
+    povStatus.style.background = 'var(--red-glow)';
+    povStatus.style.color = 'var(--red)';
+    povStatus.textContent = '越界警告';
+    alertCard.className = 'metric-card alert';
+    showToast('⚠️ POV 锁定已关闭 — 检测到 3 处上帝视角越界');
+  }
+}
+
+// ===== De-AI Filter =====
+function applyDeaiFilter(value) {
+  const badge = document.getElementById('deai-badge');
+  const countEl = document.getElementById('deai-count');
+  const labels = {
+    off: '关闭',
+    action: '动作驱动',
+    nocl: '过滤套话',
+    baihua: '大白话'
+  };
+  badge.textContent = labels[value] || value;
+
+  switch(value) {
+    case 'action':
+      badge.className = 'filter-badge';
+      countEl.textContent = '🛡 动作驱动：剔除静态描述 2处';
+      showToast('🛡 动作驱动模式 — 保留动作/对话，减少静态心理描写');
+      break;
+    case 'nocl':
+      badge.className = 'filter-badge';
+      countEl.textContent = '🛡 过滤套话: 5处已标记';
+      showToast('🚫 套话过滤启用 — "倒吸一口凉气""瞳孔猛缩" 等将被标记');
+      break;
+    case 'baihua':
+      badge.className = 'filter-badge';
+      countEl.textContent = '🛡 大白话转换: 全文优化中';
+      showToast('📝 大白话模式 — 将书面语转换为口语化表达');
+      break;
+    default:
+      badge.className = 'filter-badge blocked';
+      countEl.textContent = '🛡 过滤: 已关闭';
+      showToast('去AI味滤镜已关闭');
+  }
+}
+
+// ===== Platform Preset =====
+function selectPlatform(el, platform) {
+  el.parentElement.querySelectorAll('.platform-badge').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  const name = platform === 'fanqie' ? '番茄验证期优化' : '起点追读优化';
+  showToast('📱 钩子策略切换：' + name);
+}
+
+// ===== Tree Node Toggle =====
+function toggleTreeNode(row, nodeId) {
+  const arrow = document.getElementById('arrow-' + nodeId);
+  const children = document.getElementById('children-' + nodeId);
+  if (!children) return;
+
+  const isCollapsed = children.classList.contains('collapsed');
+  if (isCollapsed) {
+    children.classList.remove('collapsed');
+    children.style.maxHeight = children.scrollHeight + 'px';
+    arrow.classList.add('expanded');
+  } else {
+    children.style.maxHeight = children.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      children.classList.add('collapsed');
+      children.style.maxHeight = '0px';
+    });
+    arrow.classList.remove('expanded');
+  }
+}
+
+// ===== Scene Selection =====
+function selectScene(el, sceneId) {
+  document.querySelectorAll('.scene-card').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelector('.ch-title').textContent =
+    '第1章 · 辐射区醒来 — ' + el.textContent.trim();
+  document.querySelector('.ch-meta b').textContent = el.querySelector('.sc-phase').textContent + ' · ' +
+    el.querySelector('span:last-child').textContent;
+  showToast('📍 切换到场景: ' + el.textContent.trim());
+}
+
+// ===== Inline Context Menu =====
+const editor = document.getElementById('editor');
+const inlineMenu = document.getElementById('inline-menu');
+
+editor.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  const sel = window.getSelection();
+  if (sel.toString().trim().length > 0) {
+    inlineMenu.style.left = e.pageX + 'px';
+    inlineMenu.style.top = e.pageY + 'px';
+    inlineMenu.classList.add('show');
+  }
+});
+
+document.addEventListener('click', function(e) {
+  if (!inlineMenu.contains(e.target)) {
+    inlineMenu.classList.remove('show');
+  }
+});
+
+// ===== Inline Actions =====
+function inlineAction(type) {
+  inlineMenu.classList.remove('show');
+  const bar = document.getElementById('ai-inject-bar');
+  const text = document.getElementById('ai-inject-text');
+
+  const actions = {
+    expand: '以慢镜头方式分解主角的每一个微动作：肌肉的紧绷程度、呼吸节奏的变化、视线焦点的移动轨迹，增加200字左右的细节描写…',
+    gap: '在此处插入一段信息不对称：主角注意到一个细节（地上有新鲜脚印），但追踪者尚未察觉主角的位置。用环境细节暗示双方的信息差…',
+    sensory: '强化当前的感官层次：加入皮肤对辐射热的刺痛感、空气中金属粉尘的颗粒触感、远处变异体爬行时地面传来的微弱震动…',
+    hook: '在段尾埋设一个即时钩子：主角发现盖革计数器的读数突然跳升到一个荒谬的数值，暗示附近存在某种比辐射更危险的东西…',
+    deai: '用更口语化、更紧迫的短句重写本段。减少比喻和修饰词，增加主角的直觉判断和本能反应。去掉"像""仿佛""似乎"等模糊词…'
+  };
+
+  text.textContent = actions[type] || actions.expand;
+  bar.classList.add('show');
+  bar.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function acceptInject() {
+  const bar = document.getElementById('ai-inject-bar');
+  bar.classList.remove('show');
+  showToast('✅ AI 建议已应用');
+}
+
+function dismissInject() {
+  const bar = document.getElementById('ai-inject-bar');
+  bar.classList.remove('show');
+}
+
+// ===== Rhythm Chart =====
+function buildRhythmChart() {
+  const container = document.getElementById('rhythm-chart');
+  // Simulated data for 起/承/转/合 × 4 metrics
+  const data = [
+    {conflict:25,suspense:40,pleasure:10,info:60},  // 起
+    {conflict:35,suspense:55,pleasure:15,info:45},  // 承
+    {conflict:80,suspense:70,pleasure:40,info:50},  // 转 (current)
+    {conflict:50,suspense:85,pleasure:60,info:35},  // 合 (predicted)
+  ];
+  const colors = ['var(--red)','var(--accent)','var(--green)','var(--orange)'];
+
+  data.forEach(point => {
+    const group = document.createElement('div');
+    group.style.cssText = 'display:flex;gap:2px;align-items:flex-end;flex:1;';
+
+    [point.conflict, point.suspense, point.pleasure, point.info].forEach((val, i) => {
+      const bar = document.createElement('div');
+      bar.className = 'rhythm-bar';
+      bar.style.height = val + '%';
+      bar.style.background = colors[i];
+      bar.style.opacity = '0.85';
+      group.appendChild(bar);
+    });
+    container.appendChild(group);
+  });
+}
+buildRhythmChart();
+
+// ===== Toast =====
+function showToast(msg) {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.style.cssText = 'padding:8px 18px;background:var(--bg-surface);border:1px solid var(--border-active);border-radius:8px;font-size:12px;color:var(--text-primary);box-shadow:0 4px 16px rgba(0,0,0,0.4);animation:slideUp 0.3s ease;pointer-events:auto;white-space:nowrap;';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+// Add slideUp animation
+const styleSheet = document.createElement('style');
+styleSheet.textContent = '@keyframes slideUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}';
+document.head.appendChild(styleSheet);
+
+// ===== Keyboard Shortcuts =====
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    const bar = document.getElementById('ai-inject-bar');
+    const text = document.getElementById('ai-inject-text');
+    text.textContent = '基于当前场景张力和角色状态，AI 将在主角逃离变异体后引入一个新的信息点：废墟深处传来的规律性敲击声——可能是其他幸存者的求救信号，也可能是变异体的诱捕策略…';
+    bar.classList.add('show');
+    bar.scrollIntoView({behavior:'smooth',block:'nearest'});
+    showToast('🤖 AI 续写已触发');
+  }
+  if (e.ctrlKey && e.key === '`') {
+    e.preventDefault();
+    document.getElementById('pov-toggle').click();
+  }
+  if (e.ctrlKey && e.key === '/') {
+    e.preventDefault();
+    showToast('💡 指令面板：续写 / 扩写 / 润色 / 去AI味 / 埋钩子 / 视角检查');
+  }
+});
+
+// Simulate POV violation on toggle off
+let violationTimer = null;
+function simulateViolation() {
+  // Only active when POV is off
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="refresh" content="30">
+    <title>Novel Studio 运行状态</title>
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Novel Studio">
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', monospace; background:#0a0a0f; color:#f5f5f7; padding:24px; min-height:100vh; }
+        .container { max-width:600px; margin:0 auto; }
+        h1 { font-size:18px; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+        .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+        .dot.green { background:#30d158; box-shadow:0 0 8px rgba(48,209,88,0.5); animation:pulse 2s infinite; }
+        .dot.red { background:#ff453a; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:16px; margin-bottom:12px; }
+        .card h2 { font-size:13px; font-weight:600; margin-bottom:10px; color:#98989d; text-transform:uppercase; letter-spacing:0.5px; }
+        .row { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.03); }
+        .row:last-child { border:none; }
+        .label { color:#8e8e93; }
+        .value { font-weight:500; }
+        .value.good { color:#30d158; }
+        .value.warn { color:#ffd60a; }
+        .value.info { color:#0A84FF; }
+        .refreshed { text-align:center; color:#55555a; font-size:11px; margin-top:20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1><span class="dot green"></span> Novel Studio 运行正常</h1>
+
+    <div class="card">
+        <h2>服务状态</h2>
+        <div class="row"><span class="label">服务器</span><span class="value good">运行中</span></div>
+        <div class="row"><span class="label">端口</span><span class="value">5050</span></div>
+        <div class="row"><span class="label">本地地址</span><span class="value info">http://127.0.0.1:5050</span></div>
+        <div class="row"><span class="label">公网地址</span><span class="value info" id="public-url">-</span></div>
+        <div class="row"><span class="label">健康检查</span><span class="value good">每30秒</span></div>
+        <div class="row"><span class="label">崩溃自愈</span><span class="value good">连续3次失败自动重启</span></div>
+        <div class="row"><span class="label">日志轮转</span><span class="value">超过1MB自动压缩</span></div>
+    </div>
+
+    <div class="card">
+        <h2>业务数据</h2>
+        <div class="row"><span class="label">总项目数</span><span class="value" id="stat-projects">-</span></div>
+        <div class="row"><span class="label">活跃用户</span><span class="value" id="stat-users">-</span></div>
+    </div>
+
+    <div class="card">
+        <h2>功能入口</h2>
+        <div class="row"><span class="label">产品主页</span><span class="value info"><a href="/landing" style="color:var(--accent);">/landing</a></span></div>
+        <div class="row"><span class="label">写作工作台</span><span class="value info"><a href="/" style="color:var(--accent);">/</a></span></div>
+        <div class="row"><span class="label">管理后台</span><span class="value info"><a href="/admin" style="color:var(--accent);">/admin</a></span></div>
+        <div class="row"><span class="label">SEO页面</span><span class="value info"><a href="/ai-novel-writing" style="color:var(--accent);">/ai-novel-writing</a></span></div>
+        <div class="row"><span class="label">用户反馈</span><span class="value info"><a href="/feedback" style="color:var(--accent);">/feedback</a></span></div>
+        <div class="row"><span class="label">AI客服</span><span class="value">右下角 💬</span></div>
+    </div>
+
+    <div class="refreshed">每30秒自动刷新 · 上次更新: <span id="refresh-time"></span></div>
+</div>
+
+<script>
+document.getElementById('refresh-time').textContent = new Date().toLocaleString('zh-CN');
+fetch('/api/site/stats').then(r=>r.json()).then(d=>{
+    document.getElementById('stat-projects').textContent = d.total_projects;
+    document.getElementById('stat-users').textContent = d.total_users;
+});
+// 尝试读取公网地址
+fetch('/logs/public-url.txt').then(r=>r.text()).then(t=>{
+    if(t.trim()) document.getElementById('public-url').textContent = t.trim();
+}).catch(()=>{});
+</script>
+<script>if('serviceWorker'in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+</body>
+</html>
