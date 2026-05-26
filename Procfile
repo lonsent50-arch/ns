@@ -1,1 +1,1 @@
-web: python app.py
+web: sh -c 'python app.py'
