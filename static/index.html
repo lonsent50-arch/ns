@@ -15,12 +15,10 @@
     <!-- ═══ 部署配置：前端自动解耦 API 地址 ═══ -->
     <script>
     (function(){
-        // 生产部署时在此填入后端地址，本地开发自动走 localhost
         window.API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? ''
-            : '';  // ← 上线时替换为你的 Railway/Render 后端地址，如 'https://your-app.railway.app'
+            : 'https://你的后端域名.railway.app';  // ← 上线时替换为你的 Railway/Render 后端地址
 
-        // 自动拦截所有 /api/ 开头的相对路径，拼接 API_BASE_URL
         var _orig = window.fetch;
         window.fetch = function(url, opts) {
             if (typeof url === 'string' && url.startsWith('/api/') && window.API_BASE_URL) {
