@@ -50,11 +50,9 @@ _OPTIONAL_ENV_VARS = [
     'LICENSE_SECRET',
 ]
 _missing = [v for v in _REQUIRED_ENV_VARS if not os.environ.get(v)]
+_APP_DEGRADED = bool(_missing)
 if _missing:
-    raise RuntimeError(
-        f'[Novel Studio] 启动失败：缺少必需的环境变量：{", ".join(_missing)}。'
-        f'请在 .env 文件或云平台环境变量中配置。'
-    )
+    print(f'[Novel Studio] ⚠️  以下必需环境变量未设置，AI 功能将不可用：{", ".join(_missing)}。请在 .env 文件或云平台环境变量中配置。')
 _missing_opt = [v for v in _OPTIONAL_ENV_VARS if not os.environ.get(v)]
 if _missing_opt:
     print(f'[Novel Studio] ⚠️  以下可选环境变量未设置（相应功能将不可用）：{", ".join(_missing_opt)}')
@@ -436,7 +434,11 @@ def init_project_db(project_id):
 # ===== 项目管理 API =====
 @app.route('/api/health')
 def api_health():
-    return jsonify({'status': 'ok', 'version': '1.0', 'timestamp': datetime.utcnow().isoformat()})
+    status = 'degraded' if _APP_DEGRADED else 'ok'
+    resp = {'status': status, 'version': '1.0', 'timestamp': datetime.utcnow().isoformat()}
+    if _APP_DEGRADED:
+        resp['missing_env'] = _REQUIRED_ENV_VARS
+    return jsonify(resp)
 
 @app.route('/api/projects', methods=['GET'])
 def list_projects():
@@ -3351,6 +3353,14 @@ def call_ai(messages, model=None, temperature=0.7, max_tokens=2000, endpoint='ai
     if not model:
         model = get_setting('default_model', 'deepseek')
     user_id = get_user_id()
+
+    # 检查 API Key 是否已配置
+    if _APP_DEGRADED and model == 'deepseek':
+        return 'AI 服务未配置：缺少 DEEPSEEK_API_KEY，请在管理后台配置。'
+    if not GEMINI_API_KEY and model == 'gemini':
+        return 'Gemini API 未配置，请在管理后台添加 GEMINI_API_KEY。'
+    if not CLAUDE_API_KEY and model == 'claude':
+        return 'Claude API 未配置，请在管理后台添加 CLAUDE_API_KEY。'
 
     # 限流检查
     if not check_rate_limit(user_id, endpoint):
