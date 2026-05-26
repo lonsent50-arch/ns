@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m py_compile app.py novel_analyzer.py supabase_client.py supabase_repo.py server.py
+
+      - name: Check import integrity
+        run: python -c "from novel_analyzer import analyze_cliffhanger_tail, realism_radar, analyze_rhythm, scan_cliches"

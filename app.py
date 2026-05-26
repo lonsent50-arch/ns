@@ -20,9 +20,22 @@ from datetime import datetime
 from pathlib import Path
 
 import gzip
-from flask import Flask, request, jsonify, send_from_directory, render_template_string, Response
+from flask import Flask, request, jsonify, send_from_directory, render_template_string, Response, g
 from flask_cors import CORS
 import markdown
+from novel_analyzer import (analyze_cliffhanger_tail, realism_radar,
+                             analyze_rhythm, scan_cliches)
+
+# ── Supabase 数据仓库（多租户云端模式）──
+try:
+    from supabase_repo import init_supabase_for_request, get_repo, get_current_user_id, is_supabase_mode
+    _HAS_SUPABASE_REPO = True
+except ImportError:
+    _HAS_SUPABASE_REPO = False
+    def init_supabase_for_request(): pass
+    def get_repo(): return None
+    def get_current_user_id(): return ''
+    def is_supabase_mode(): return False
 
 # ── 启动时环境变量校验 ──
 _REQUIRED_ENV_VARS = [
@@ -75,6 +88,15 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization", "X-Admin-Token"],
     }
 })
+
+@app.before_request
+def _init_supabase():
+    """每个请求前初始化 Supabase 客户端（从 JWT 注入）"""
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        try:
+            init_supabase_for_request()
+        except Exception as e:
+            print(f'[Supabase] before_request 初始化失败: {e}')
 
 @app.after_request
 def _add_response_headers(response):
@@ -133,6 +155,9 @@ def _validate_project_id():
     if project_id:
         if not validate_project_id(project_id):
             return jsonify({'error': '无效的项目ID'}), 400
+        # Supabase 模式：跳过本地文件检查
+        if _HAS_SUPABASE_REPO and is_supabase_mode():
+            return
         project_path = PROJECTS_DIR / project_id
         if not project_path.is_dir() or not (project_path / 'novel.db').exists():
             return jsonify({'error': '项目不存在'}), 404
@@ -409,10 +434,30 @@ def init_project_db(project_id):
     conn.close()
 
 # ===== 项目管理 API =====
+@app.route('/api/health')
+def api_health():
+    return jsonify({'status': 'ok', 'version': '1.0', 'timestamp': datetime.utcnow().isoformat()})
+
 @app.route('/api/projects', methods=['GET'])
 def list_projects():
-    """列出所有项目"""
-    # RLS TODO: 接入多租户后，过滤 WHERE user_id = get_user_id()
+    """列出所有项目（Supabase 模式自动多租户过滤）"""
+    # Supabase 模式：RLS 自动按 user_id 过滤
+    repo = get_repo()
+    if repo:
+        books = repo.list_books()
+        projects = []
+        for b in (books or []):
+            projects.append({
+                'id': b['id'],
+                'name': b.get('title', '未命名项目'),
+                'description': b.get('description', ''),
+                'genre': b.get('genre', ''),
+                'created_at': b.get('created_at', ''),
+                'updated_at': b.get('updated_at', '')
+            })
+        return jsonify(projects)
+
+    # SQLite 模式（降级）
     projects = []
     for pdir in PROJECTS_DIR.iterdir():
         if pdir.is_dir() and (pdir / 'novel.db').exists():
@@ -433,15 +478,24 @@ def create_project():
     """创建新项目"""
     # Feature Gating: 检查项目数限制
     if not check_feature('create_project'):
-        lic = get_current_license()
-        tier = lic['tier'] if lic else 'free'
-        limit = get_tier_limits(tier)['projects']
+        tier = get_user_id()  # 复用 get_user_id 的 Supabase 逻辑
+        limit = 50 if check_feature('premium') else 1
         return jsonify({'error': f'免费版最多创建{limit}个项目，请升级会员'}), 403
-    
+
     data = request.json
     name = data.get('name', '未命名项目')
     desc = data.get('description', '')
     genre = data.get('genre', '')
+
+    # Supabase 模式
+    repo = get_repo()
+    if repo:
+        project_id = repo.create_book(title=name, description=desc, genre=genre)
+        if project_id:
+            return jsonify({'id': project_id, 'name': name})
+        return jsonify({'error': '创建项目失败'}), 500
+
+    # SQLite 模式（降级）
     project_id = secrets.token_hex(8)
     (PROJECTS_DIR / project_id).mkdir(exist_ok=True)
 
@@ -450,7 +504,6 @@ def create_project():
 
     conn = get_db(project_id)
     conn.execute('INSERT INTO project_info VALUES (?, ?)', ('name', name))
-    # RLS TODO: 接入多租户后，记录创建者 conn.execute('INSERT OR REPLACE INTO project_info VALUES (?, ?)', ('user_id', get_user_id()))
     if desc:
         conn.execute('INSERT INTO project_info VALUES (?, ?)', ('description', desc))
     if genre:
@@ -459,12 +512,21 @@ def create_project():
     conn.execute('INSERT INTO project_info VALUES (?, ?)', ('updated_at', now))
     conn.commit()
     conn.close()
-    
+
     return jsonify({'id': project_id, 'name': name})
 
 @app.route('/api/projects/<project_id>', methods=['DELETE'])
 def delete_project(project_id):
     """删除项目"""
+    # Supabase 模式：RLS 确保只能删除自己的项目
+    repo = get_repo()
+    if repo:
+        _, err = repo.delete_book(project_id)
+        if err:
+            return jsonify({'error': '删除失败'}), 500
+        return jsonify({'success': True})
+
+    # SQLite 模式（降级）
     import shutil
     project_path = PROJECTS_DIR / project_id
     if project_path.exists():
@@ -474,6 +536,22 @@ def delete_project(project_id):
 @app.route('/api/projects/<project_id>/info', methods=['GET'])
 def get_project_info(project_id):
     """获取项目信息（含基础统计）"""
+    repo = get_repo()
+    if repo:
+        book = repo.get_book(project_id)
+        stats = repo.get_book_stats(project_id)
+        if not book:
+            return jsonify({'error': '项目不存在'}), 404
+        return jsonify({
+            'name': book.get('title', '未命名项目'),
+            'description': book.get('description', ''),
+            'genre': book.get('genre', ''),
+            'created_at': book.get('created_at', ''),
+            'updated_at': book.get('updated_at', ''),
+            'total_words': stats.get('total_words', 0),
+            'chapter_count': stats.get('chapter_count', 0),
+        })
+
     conn = get_db(project_id)
     info = conn.execute('SELECT key, value FROM project_info').fetchall()
     total_words = conn.execute('SELECT COALESCE(SUM(word_count), 0) as total FROM chapters').fetchone()['total']
@@ -488,6 +566,20 @@ def get_project_info(project_id):
 def update_project_info(project_id):
     """更新项目信息"""
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        update_data = {}
+        if 'name' in data:
+            update_data['title'] = data['name']
+        if 'description' in data:
+            update_data['description'] = data['description']
+        if 'genre' in data:
+            update_data['genre'] = data['genre']
+        if update_data:
+            repo.update_book(project_id, update_data)
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     for key, value in data.items():
         existing = conn.execute('SELECT key FROM project_info WHERE key = ?', (key,)).fetchone()
@@ -495,7 +587,7 @@ def update_project_info(project_id):
             conn.execute('UPDATE project_info SET value = ? WHERE key = ?', (str(value), key))
         else:
             conn.execute('INSERT INTO project_info VALUES (?, ?)', (key, str(value)))
-    conn.execute('UPDATE project_info SET value = ? WHERE key = ?', 
+    conn.execute('UPDATE project_info SET value = ? WHERE key = ?',
                  (datetime.now().isoformat(), 'updated_at'))
     conn.commit()
     conn.close()
@@ -504,6 +596,9 @@ def update_project_info(project_id):
 # ===== 角色管理 API =====
 @app.route('/api/projects/<project_id>/characters', methods=['GET'])
 def list_characters(project_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_characters(project_id))
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM characters ORDER BY created_at').fetchall()
     conn.close()
@@ -512,6 +607,13 @@ def list_characters(project_id):
 @app.route('/api/projects/<project_id>/characters', methods=['POST'])
 def create_character(project_id):
     data = request.json
+    repo = get_repo()
+    if repo:
+        char_id = repo.create_character(project_id, data)
+        if char_id:
+            return jsonify({'id': char_id})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     char_id = secrets.token_hex(8)
     conn = get_db(project_id)
@@ -530,6 +632,13 @@ def create_character(project_id):
 @app.route('/api/projects/<project_id>/characters/<char_id>', methods=['PUT'])
 def update_character(project_id, char_id):
     data = request.json
+    repo = get_repo()
+    if repo:
+        _, err = repo.update_character(char_id, data)
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     conn.execute('''
         UPDATE characters SET name=?, gender=?, age=?, personality=?, background=?, 
@@ -546,6 +655,13 @@ def update_character(project_id, char_id):
 
 @app.route('/api/projects/<project_id>/characters/<char_id>', methods=['DELETE'])
 def delete_character(project_id, char_id):
+    repo = get_repo()
+    if repo:
+        _, err = repo.delete_character(char_id)
+        if err:
+            return jsonify({'error': '删除失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     conn.execute('DELETE FROM characters WHERE id = ?', (char_id,))
     conn.commit()
@@ -609,6 +725,9 @@ def save_character_knowledge(project_id, char_id):
 # ===== 大纲管理 API =====
 @app.route('/api/projects/<project_id>/outline', methods=['GET'])
 def list_outline(project_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_outline(project_id))
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM outline ORDER BY sort_order, created_at').fetchall()
     conn.close()
@@ -617,16 +736,22 @@ def list_outline(project_id):
 @app.route('/api/projects/<project_id>/outline', methods=['POST'])
 def create_outline_node(project_id):
     data = request.json
+    repo = get_repo()
+    if repo:
+        node_id = repo.create_outline_node(project_id, data)
+        if node_id:
+            return jsonify({'id': node_id})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     node_id = secrets.token_hex(8)
     conn = get_db(project_id)
-    # 获取同级最大排序号
     max_sort = conn.execute('SELECT COALESCE(MAX(sort_order), 0) as mx FROM outline WHERE parent_id = ?',
                            (data.get('parent_id'),)).fetchone()['mx']
     conn.execute('''
         INSERT INTO outline (id, parent_id, title, content, level, sort_order, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (node_id, data.get('parent_id'), data.get('title', '新节点'), 
+    ''', (node_id, data.get('parent_id'), data.get('title', '新节点'),
           data.get('content', ''), data.get('level', 0), max_sort + 1, now, now))
     conn.commit()
     conn.close()
@@ -635,6 +760,13 @@ def create_outline_node(project_id):
 @app.route('/api/projects/<project_id>/outline/<node_id>', methods=['PUT'])
 def update_outline_node(project_id, node_id):
     data = request.json
+    repo = get_repo()
+    if repo:
+        _, err = repo.update_outline_node(node_id, data)
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     fields = []
     values = []
@@ -653,6 +785,13 @@ def update_outline_node(project_id, node_id):
 @app.route('/api/projects/<project_id>/outline/<node_id>', methods=['DELETE'])
 def delete_outline_node(project_id, node_id):
     """递归删除大纲节点"""
+    repo = get_repo()
+    if repo:
+        _, err = repo.delete_outline_node(node_id)
+        if err:
+            return jsonify({'error': '删除失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     def delete_recursive(nid):
         children = conn.execute('SELECT id FROM outline WHERE parent_id = ?', (nid,)).fetchall()
@@ -667,6 +806,9 @@ def delete_outline_node(project_id, node_id):
 # ===== 章节管理 API =====
 @app.route('/api/projects/<project_id>/chapters', methods=['GET'])
 def list_chapters(project_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_chapters(project_id))
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM chapters ORDER BY sort_order, created_at').fetchall()
     conn.close()
@@ -675,6 +817,13 @@ def list_chapters(project_id):
 @app.route('/api/projects/<project_id>/chapters', methods=['POST'])
 def create_chapter(project_id):
     data = request.json
+    repo = get_repo()
+    if repo:
+        chapter_id = repo.create_chapter(project_id, data.get('title', '新章节'))
+        if chapter_id:
+            return jsonify({'id': chapter_id})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     chapter_id = secrets.token_hex(8)
     conn = get_db(project_id)
@@ -690,16 +839,23 @@ def create_chapter(project_id):
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>', methods=['PUT'])
 def update_chapter(project_id, chapter_id):
     data = request.json
-    conn = get_db(project_id)
     content = data.get('content', '')
     word_count = len(content.replace(' ', '').replace('\n', ''))
+
+    repo = get_repo()
+    if repo:
+        _, err = repo.update_chapter(chapter_id, {'title': data.get('title'), 'content': content})
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True, 'word_count': word_count})
+
+    conn = get_db(project_id)
 
     # 自动保存版本快照（仅当内容变化超过50字时）
     old = conn.execute('SELECT title, content, word_count FROM chapters WHERE id = ?', (chapter_id,)).fetchone()
     if old and content:
         old_content = old['content'] or ''
         if abs(len(content) - len(old_content)) > 50:
-            # 获取当前最大版本号
             max_ver = conn.execute(
                 'SELECT COALESCE(MAX(version), 0) FROM chapter_snapshots WHERE chapter_id = ?',
                 (chapter_id,)
@@ -730,7 +886,10 @@ def update_chapter(project_id, chapter_id):
 
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>/snapshots', methods=['GET'])
 def list_chapter_snapshots(project_id, chapter_id):
-    """列出章节所有版本快照"""
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_chapter_snapshots(chapter_id))
+
     conn = get_db(project_id)
     snaps = conn.execute('''
         SELECT id, version, title, word_count, snapshot_at
@@ -742,7 +901,13 @@ def list_chapter_snapshots(project_id, chapter_id):
 
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>/snapshots/<snap_id>', methods=['GET'])
 def get_chapter_snapshot(project_id, chapter_id, snap_id):
-    """获取特定版本快照的完整内容"""
+    repo = get_repo()
+    if repo:
+        snap = repo.get_snapshot(snap_id)
+        if not snap:
+            return jsonify({'error': '快照不存在'}), 404
+        return jsonify(snap)
+
     conn = get_db(project_id)
     snap = conn.execute(
         'SELECT * FROM chapter_snapshots WHERE id = ? AND chapter_id = ?',
@@ -756,6 +921,19 @@ def get_chapter_snapshot(project_id, chapter_id, snap_id):
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>/snapshots/<snap_id>/revert', methods=['POST'])
 def revert_chapter_snapshot(project_id, chapter_id, snap_id):
     """回退到指定版本（创建当前版本快照后恢复）"""
+    repo = get_repo()
+    if repo:
+        snap = repo.get_snapshot(snap_id)
+        if not snap:
+            return jsonify({'error': '快照不存在'}), 404
+        repo.update_chapter(chapter_id, {
+            'title': snap['title'],
+            'content': snap['content']
+        })
+        return jsonify({'success': True, 'title': snap['title'],
+                        'word_count': snap.get('word_count', 0),
+                        'version': snap.get('version', 0)})
+
     conn = get_db(project_id)
     snap = conn.execute(
         'SELECT * FROM chapter_snapshots WHERE id = ? AND chapter_id = ?',
@@ -764,7 +942,6 @@ def revert_chapter_snapshot(project_id, chapter_id, snap_id):
     if not snap:
         conn.close()
         return jsonify({'error': '快照不存在'}), 404
-    # 先保存当前版本
     current = conn.execute('SELECT title, content, word_count FROM chapters WHERE id = ?', (chapter_id,)).fetchone()
     if current:
         max_ver = conn.execute(
@@ -777,7 +954,6 @@ def revert_chapter_snapshot(project_id, chapter_id, snap_id):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (secrets.token_hex(8), chapter_id, max_ver + 1, current['title'],
               current['content'] or '', current['word_count'] or 0, now))
-    # 恢复到目标版本
     conn.execute('''
         UPDATE chapters SET title = ?, content = ?, word_count = ?, updated_at = ?
         WHERE id = ?
@@ -789,6 +965,13 @@ def revert_chapter_snapshot(project_id, chapter_id, snap_id):
 
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>', methods=['DELETE'])
 def delete_chapter(project_id, chapter_id):
+    repo = get_repo()
+    if repo:
+        _, err = repo.delete_chapter(chapter_id)
+        if err:
+            return jsonify({'error': '删除失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     conn.execute('DELETE FROM chapters WHERE id = ?', (chapter_id,))
     conn.commit()
@@ -799,6 +982,11 @@ def delete_chapter(project_id, chapter_id):
 def reorder_chapters(project_id):
     """重新排序章节"""
     data = request.json
+    repo = get_repo()
+    if repo:
+        repo.reorder_chapters(data.get('chapter_ids', []))
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     for idx, chapter_id in enumerate(data.get('chapter_ids', [])):
         conn.execute('UPDATE chapters SET sort_order = ? WHERE id = ?', (idx, chapter_id))
@@ -809,16 +997,23 @@ def reorder_chapters(project_id):
 # ===== 写作统计 API =====
 @app.route('/api/projects/<project_id>/stats', methods=['GET'])
 def get_writing_stats(project_id):
-    conn = get_db(project_id)
     date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    repo = get_repo()
+    if repo:
+        stats = repo.get_writing_stats(project_id, date)
+        if not stats:
+            stats = {'date': date, 'chars_added': 0, 'chars_deleted': 0, 'time_spent': 0, 'sessions': 0}
+        book_stats = repo.get_book_stats(project_id)
+        return jsonify({**stats, 'total_words': book_stats.get('total_words', 0),
+                        'chapter_count': book_stats.get('chapter_count', 0)})
+
+    conn = get_db(project_id)
     stats = conn.execute('SELECT * FROM writing_stats WHERE date = ?', (date,)).fetchone()
     if not stats:
         stats = {'date': date, 'chars_added': 0, 'chars_deleted': 0, 'time_spent': 0, 'sessions': 0}
     else:
         stats = dict(stats)
-    # 获取总字数
     total_words = conn.execute('SELECT COALESCE(SUM(word_count), 0) as total FROM chapters').fetchone()['total']
-    # 获取章节数
     chapter_count = conn.execute('SELECT COUNT(*) as cnt FROM chapters').fetchone()['cnt']
     conn.close()
     return jsonify({**stats, 'total_words': total_words, 'chapter_count': chapter_count})
@@ -827,6 +1022,20 @@ def get_writing_stats(project_id):
 def update_writing_stats(project_id):
     data = request.json
     date = data.get('date', datetime.now().strftime('%Y-%m-%d'))
+
+    repo = get_repo()
+    if repo:
+        _, err = repo.upsert_writing_stats(project_id, {
+            'date': date,
+            'chars_added': data.get('chars_added', 0),
+            'chars_deleted': data.get('chars_deleted', 0),
+            'time_spent': data.get('time_spent', 0),
+            'sessions': data.get('sessions', 0),
+        })
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     existing = conn.execute('SELECT date FROM writing_stats WHERE date = ?', (date,)).fetchone()
     if existing:
@@ -846,6 +1055,10 @@ def update_writing_stats(project_id):
 # ===== 写作目标 API =====
 @app.route('/api/projects/<project_id>/goals', methods=['GET'])
 def list_goals(project_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_goals(project_id))
+
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM writing_goals WHERE is_active = 1').fetchall()
     conn.close()
@@ -854,6 +1067,14 @@ def list_goals(project_id):
 @app.route('/api/projects/<project_id>/goals', methods=['POST'])
 def create_goal(project_id):
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        goal_id = repo.create_goal(project_id, data)
+        if goal_id:
+            return jsonify({'id': goal_id})
+        return jsonify({'error': '创建失败'}), 500
+
     goal_id = secrets.token_hex(8)
     conn = get_db(project_id)
     conn.execute('''
@@ -868,6 +1089,14 @@ def create_goal(project_id):
 @app.route('/api/projects/<project_id>/goals/<goal_id>', methods=['PUT'])
 def update_goal(project_id, goal_id):
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        _, err = repo.update_goal(goal_id, data)
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     for key in ['goal_type', 'target_value', 'current_value', 'deadline', 'is_active']:
         if key in data:
@@ -914,8 +1143,61 @@ def _extract_keywords(content, max_keywords=15):
 def _search_rag_context(project_id, keywords, conn=None):
     """基于关键词从 SQLite 中检索相关上下文。
     检索范围：章节摘要、角色、情节线程、关键事件。
+    Supabase 模式：简化为返回角色档案和近期摘要（不做关键词精准检索）。
     返回：结构化的上下文字符串。
     """
+    # Supabase 模式：简化检索
+    repo = get_repo()
+    if repo:
+        if not keywords:
+            return ''
+        parts = []
+        # 获取所有角色概要
+        all_chars = repo.list_characters(project_id)
+        if all_chars:
+            # 按关键词过滤角色
+            matched_chars = []
+            for c in all_chars:
+                name = c.get('name', '')
+                personality = c.get('personality', '') or ''
+                background = c.get('background', '') or ''
+                goal = c.get('goal', '') or ''
+                combined = f'{name} {personality} {background} {goal}'
+                if any(kw in combined for kw in keywords[:5]):
+                    matched_chars.append(c)
+            if matched_chars:
+                parts.append('\n【相关角色】')
+                for c in matched_chars[:5]:
+                    detail = c.get('name', '')
+                    if c.get('personality'):
+                        detail += f'（{c["personality"][:60]}）'
+                    if c.get('goal'):
+                        detail += f' 目标：{c["goal"][:50]}'
+                    parts.append(f'- {detail}')
+            elif all_chars:
+                parts.append('\n【角色档案】')
+                for c in all_chars[:10]:
+                    detail = c.get('name', '')
+                    if c.get('personality'):
+                        detail += f'（{c["personality"][:60]}）'
+                    if c.get('goal'):
+                        detail += f' 目标：{c["goal"][:50]}'
+                    parts.append(f'- {detail}')
+
+        # 获取近期摘要
+        summaries = repo.list_chapter_summaries(project_id, limit=3)
+        chapters_map = {}
+        if summaries:
+            chapters_list = repo.list_chapters(project_id)
+            chapters_map = {c['id']: c for c in chapters_list} if chapters_list else {}
+            parts.append('【相关前文摘要】')
+            for s in reversed(summaries):
+                ch = chapters_map.get(s.get('chapter_id', ''), {})
+                title = ch.get('title', f'章节{s.get("chapter_id", "")}')
+                parts.append(f'《{title}》：{s.get("summary", "")[:200]}')
+
+        return '\n'.join(parts) if parts else ''
+
     own_conn = conn is None
     if own_conn:
         conn = get_db(project_id)
@@ -1020,6 +1302,108 @@ def build_condensed_context(project_id, current_chapter_id=None):
     3. [当前章节细化线索] — 当前章的 level-2/3 大纲子节点
     4. [本章登场人物极简标签] — 仅核心角色，每人 ≤60 字
     """
+    # Supabase 模式
+    repo = get_repo()
+    if repo:
+        parts = []
+        current_chapter_title = None
+        current_chapter_content = ''
+        current_chapter_sort = 0
+
+        if current_chapter_id:
+            ch = repo.get_chapter(current_chapter_id)
+            if ch:
+                current_chapter_title = ch.get('title', '')
+                current_chapter_content = ch.get('content') or ''
+                current_chapter_sort = ch.get('sort_order', 0)
+
+        # 2. 当前卷核心大纲
+        outline_nodes = repo.list_outline(project_id)
+        volumes = [n for n in outline_nodes if n.get('level') == 0]
+        chapters_outline = [n for n in outline_nodes if n.get('level') == 1]
+        sub_nodes_map = {}
+        for n in outline_nodes:
+            if n.get('level', 0) >= 2 and n.get('parent_id'):
+                sub_nodes_map.setdefault(n['parent_id'], []).append(n)
+
+        if volumes:
+            active_volume = None
+            for v in volumes:
+                v_chapters = [c for c in chapters_outline if c.get('parent_id') == v.get('id')]
+                for vc in v_chapters:
+                    if current_chapter_title and (
+                        current_chapter_title in vc.get('title', '')
+                        or vc.get('title', '') in (current_chapter_title or '')
+                    ):
+                        active_volume = v
+                        break
+                if active_volume:
+                    break
+            if not active_volume:
+                active_volume = volumes[0] if volumes else None
+
+            if active_volume:
+                v_chapters = [c for c in chapters_outline if c.get('parent_id') == active_volume.get('id')]
+                outline_lines = [f'【当前卷核心大纲】{active_volume.get("title", "")}']
+                for vc in v_chapters:
+                    marker = ' ← 当前' if (current_chapter_title and (
+                        current_chapter_title in vc.get('title', '')
+                        or vc.get('title', '') in (current_chapter_title or '')
+                    )) else ''
+                    outline_lines.append(f'  {vc.get("title", "")}{marker}')
+                parts.append('\n'.join(outline_lines))
+
+        # 3. 前一章梗概
+        if current_chapter_id and current_chapter_sort > 1:
+            chapters_list = repo.list_chapters(project_id)
+            prev_ch = None
+            for c in chapters_list:
+                if c.get('sort_order', 0) == current_chapter_sort - 1:
+                    prev_ch = c
+                    break
+            if prev_ch:
+                summary_data = repo.get_chapter_summary(prev_ch['id'])
+                summary = summary_data.get('summary', '') if summary_data else ''
+                if not summary:
+                    # 即时生成摘要
+                    content = prev_ch.get('content') or ''
+                    if content:
+                        cleaned = content.replace('\n', ' ').replace('\r', ' ').strip()
+                        summary = cleaned[:500] if len(cleaned) <= 500 else f'{cleaned[:200]}……{cleaned[-200:]}'
+                    else:
+                        summary = '（本章暂无内容）'
+                parts.append(f'【前一章缩略梗概】{prev_ch.get("title", "")}\n{summary[:500]}')
+
+        # 4. 当前章节线索
+        if current_chapter_title:
+            outline_node = None
+            for n in chapters_outline:
+                if n.get('title') and (
+                    current_chapter_title in n.get('title', '')
+                    or n.get('title', '') in current_chapter_title
+                ):
+                    outline_node = n
+                    break
+            if outline_node:
+                sub_nodes = sub_nodes_map.get(outline_node['id'], [])
+                if sub_nodes:
+                    clue_lines = [f'【当前章节线索】{outline_node.get("title", "")}']
+                    for sn in sub_nodes:
+                        prefix = '  ◦' if sn.get('level') == 3 else '•'
+                        clue_lines.append(f'  {prefix} {sn.get("title", "")}')
+                        if sn.get('content'):
+                            clue_lines.append(f'    {sn["content"][:120]}')
+                    parts.append('\n'.join(clue_lines))
+                elif outline_node.get('content'):
+                    parts.append(f'【当前章节线索】{outline_node.get("title", "")}\n  {outline_node["content"][:300]}')
+
+        # 5. 登场人物标签
+        char_tags = _build_character_tags(project_id, current_chapter_id)
+        if char_tags:
+            parts.append(f'【登场人物标签】\n{char_tags}')
+
+        return '\n\n'.join(parts) if parts else ''
+
     conn = get_db(project_id)
     parts = []
 
@@ -1155,6 +1539,24 @@ def _get_or_generate_summary(conn, chapter_row, max_chars=500):
 
 def _build_character_tags(project_id, current_chapter_id, conn=None):
     """构建登场人物极简标签：每人姓名 + 性格关键词 + 目标"""
+    # Supabase 模式
+    repo = get_repo()
+    if repo:
+        chars = repo.list_characters(project_id)
+        if not chars:
+            return ''
+        tags = []
+        for c in chars[:6]:
+            tag = f'{c.get("name", "")}'
+            if c.get('personality'):
+                pers = c['personality'].replace('\n', ' ').strip()[:40]
+                tag += f'：{pers}'
+            if c.get('goal'):
+                goal = c['goal'].replace('\n', ' ').strip()[:30]
+                tag += f' | 目标：{goal}'
+            tags.append(f'- {tag}')
+        return '\n'.join(tags)
+
     own_conn = False
     if conn is None:
         conn = get_db(project_id)
@@ -1189,6 +1591,23 @@ def _build_character_tags(project_id, current_chapter_id, conn=None):
 
 def _extract_outline_keywords(project_id):
     """从大纲中提取关键词列表，用于偏离度检测"""
+    # Supabase 模式
+    repo = get_repo()
+    if repo:
+        nodes = repo.list_outline(project_id)
+        keywords = set()
+        for n in nodes:
+            if n.get('level', 0) < 1:
+                continue
+            text = (n.get('title', '') + ' ' + (n.get('content') or ''))
+            import re
+            words = re.split(r'[，。、；：！？\s,\.;:!?\n]+', text)
+            for w in words:
+                w = w.strip()
+                if 2 <= len(w) <= 12 and w not in ('本章', '章节', '情节', '故事', '一个', '这个', '那个'):
+                    keywords.add(w)
+        return list(keywords)
+
     conn = get_db(project_id)
     nodes = conn.execute(
         'SELECT title, content FROM outline WHERE level >= 1 ORDER BY sort_order'
@@ -1510,9 +1929,15 @@ def api_pov_audit(project_id):
     chapter_id = data.get('chapter_id', '')
 
     # 获取所有角色名
-    conn = get_db(project_id)
-    chars = conn.execute('SELECT name FROM characters ORDER BY created_at').fetchall()
-    all_chars = [c['name'] for c in chars]
+    repo = get_repo()
+    conn = None
+    if repo:
+        chars_data = repo.list_characters(project_id)
+        all_chars = [c.get('name', '') for c in chars_data]
+    else:
+        conn = get_db(project_id)
+        chars = conn.execute('SELECT name FROM characters ORDER BY created_at').fetchall()
+        all_chars = [c['name'] for c in chars]
 
     # 如果没有指定 POV 角色，默认取第一个
     if not pov_char and all_chars:
@@ -1523,7 +1948,11 @@ def api_pov_audit(project_id):
     result['all_characters'] = all_chars
 
     # 知识泄露审计（角色信息隔离墙）
-    if chapter_id:
+    # Supabase 模式：跳过知识泄露审计（需要复杂 SQL 查询）
+    if repo:
+        result['knowledge_leaks'] = []
+        result['knowledge_safe'] = True
+    elif chapter_id and conn:
         knowledge_result = audit_knowledge_leaks(content, chapter_id, all_chars, conn)
         result['knowledge_leaks'] = knowledge_result.get('leaks', [])
         result['knowledge_safe'] = knowledge_result.get('safe', True)
@@ -1531,386 +1960,11 @@ def api_pov_audit(project_id):
         result['knowledge_leaks'] = []
         result['knowledge_safe'] = True
 
-    conn.close()
+    if conn:
+        conn.close()
     return jsonify(result)
 
 
-# ===== 冲突密度实时分析 =====
-CONFLICT_KEYWORDS = [
-    '杀', '死', '血', '战', '剑', '刀', '枪', '箭', '爆炸', '毁灭',
-    '对抗', '冲突', '争斗', '搏斗', '激战', '决斗', '厮杀',
-    '怒吼', '咆哮', '威胁', '逼问', '质问', '冷笑', '怒', '恨', '仇',
-    '危险', '危机', '陷阱', '暗算', '偷袭',
-]
-SUSPENSE_KEYWORDS = [
-    '突然', '忽然', '竟然', '谁知', '没想到', '不料', '奇怪', '诡异',
-    '神秘', '秘密', '隐藏', '暗中', '黑影', '悄悄', '偷偷',
-    '谜', '疑', '似乎', '仿佛', '隐约', '莫名',
-    '未知', '未解', '悬', '伏笔',
-]
-PLEASURE_KEYWORDS = [
-    '笑', '乐', '喜', '悦', '爽', '得意', '满足', '欣慰',
-    '收获', '突破', '升级', '成长', '领悟', '成功',
-    '奖励', '宝物', '机缘', '奇遇',
-]
-INFO_KEYWORDS = [
-    '说', '道', '讲', '告诉', '解释', '说明', '描述',
-    '世界', '设定', '规则', '系统', '功法', '修为',
-    '因为', '所以', '原来', '从前', '历史', '传说',
-    '介绍', '记载', '典籍',
-]
-
-# ===== 生存逻辑与写实度雷达 — 关键词表 =====
-
-POWER_FANTASY_MARKERS = [
-    '秒杀', '碾压', '横扫', '无敌', '一招', '瞬间击杀',
-    '倒头便拜', '纳头便拜', '虎躯一震', '王霸之气', '霸气侧漏',
-    '轻松击败', '毫不费力', '抬手间', '翻手', '灰飞烟灭',
-    '蝼蚁', '废物', '不知死活', '自寻死路', '蚍蜉撼树',
-    '随手', '一挥', '轰杀', '镇压', '弹指间',
-    '轻描淡写', '不屑', '嗤笑', '冷喝', '区区',
-]
-
-ENVIRONMENT_PRESSURE_MARKERS = [
-    '饿', '饥', '渴', '冷', '热', '冻', '伤口', '流血', '骨折',
-    '疲惫', '力竭', '喘', '汗', '晕', '虚', '踉跄', '发抖',
-    '泥泞', '风沙', '暴雨', '暴雪', '烈日', '酷寒', '潮湿',
-    '腐臭', '血腥味', '汗味', '霉味', '铁锈味',
-    '粮食', '干粮', '水源', '水袋', '药', '绷带', '包扎',
-    '喘息', '颤抖', '发白', '冷汗', '脱力', '虚脱',
-    '擦伤', '淤青', '化脓', '肿胀', '烧伤', '冻伤',
-    '腐肉', '蛆', '霉', '锈', '渍', '垢',
-]
-
-COGNITIVE_GAP_MARKERS = [
-    '以为', '误以为', '并不知道', '并未察觉', '浑然不知',
-    '毫不知情', '还被蒙在', '尚不知', '被误导',
-    '判断失误', '误解', '错误推断', '信息不全',
-    '殊不知', '却不知', '完全没想到', '始料未及',
-    '各自', '双方都不', '谁也不', '彼此不知',
-    '猜错了', '想错了', '估计错', '看走眼',
-    '还当', '仍以', '只道是', '哪知', '怎料',
-]
-
-# ===== 断章钩子密度分析器 — 关键词表 =====
-
-CLIFFHANGER_HIGH_MARKERS = [
-    # 高潮切点 — 在关键处切断
-    '突然', '就在这时', '猛然', '瞬间', '刹那',
-    '门开了', '门外', '背后传来', '回头一看', '抬头一看',
-    '竟', '赫然', '猛地', '陡然', '骤然',
-    # 秘密揭晓 — 核心信息即将暴露
-    '秘密', '真相', '原来', '其实', '不是别人',
-    '竟然是', '怎么会', '不可能', '怎么是你',
-    # 致命危机 — 危险在最后一句降临
-    '危险', '杀意', '杀气', '寒光', '死亡',
-    '来不及', '晚了', '陷阱', '冷箭', '毒',
-    '匕首', '血', '倒', '断',
-    # 身份反差 — 戏剧冲突爆发
-    '终于来了', '等你很久了', '你来了',
-    '被人', '挡', '拦住', '堵',
-    # 反转提示
-    '却', '然而', '但', '可', '谁知',
-]
-
-CLIFFHANGER_LOW_MARKERS = [
-    # 平淡收尾 — 日常结束型
-    '回去了', '离开', '告辞', '告别', '往回走',
-    '休息', '睡觉', '躺下', '闭眼', '晚安', '明天',
-    '天色已晚', '夜幕降临', '夜幕', '天色渐暗',
-    '一天', '告一段落', '结束', '完毕',
-    # 吃饭休息型
-    '吃饭', '用餐', '喝茶', '喝酒', '享',
-    # 总结回顾型
-    '回顾', '总结', '总之', '不管怎样', '无论如何',
-    '虽然', '但毕竟', '也罢',
-    # 平铺直叙型
-    '接下来', '然后', '接着', '之后', '不久',
-    '片刻', '一会儿', '不久之后',
-]
-
-def analyze_cliffhanger_tail(tail_text):
-    """断章钩子密度分析：分析章节尾部文本的悬念切断质量。
-
-    核心指标：
-    - hook_score: 0-100 钩子强度评分
-    - cut_quality: 切点是否在高潮处（最后一句话是否含高潮标记）
-    - last_sentence_hook: 最后一句话是否构成有效钩子
-    - diagnosis: 诊断建议
-
-    Args:
-        tail_text: 章节末尾 15% 的文本（或最后 300-500 字）
-
-    Returns:
-        dict: 完整的钩子分析结果
-    """
-    if not tail_text or len(tail_text.strip()) < 50:
-        return {
-            'hook_score': 20,
-            'cut_quality': 'insufficient',
-            'last_sentence_hook': False,
-            'high_markers_hit': [],
-            'low_markers_hit': [],
-            'diagnosis': '文本过短，无法进行断章钩子分析。请写入至少300字后重新检测。',
-            'suggestion': ''
-        }
-
-    text = tail_text.strip()
-
-    # 按句号/问号/感叹号分句
-    import re
-    sentences = re.split(r'[。！？!?\n]', text)
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if not sentences:
-        sentences = [text]
-
-    # 获取最后 3 句（最重要的切点区域）
-    last_sentences = sentences[-3:] if len(sentences) >= 3 else sentences
-    last_sentence = sentences[-1]
-
-    # 统计高潮标记命中
-    high_hits = []
-    for line in last_sentences:
-        for kw in CLIFFHANGER_HIGH_MARKERS:
-            if kw in line:
-                high_hits.append({'keyword': kw, 'sentence': line[:60]})
-
-    # 统计平淡标记命中
-    low_hits = []
-    for line in last_sentences:
-        for kw in CLIFFHANGER_LOW_MARKERS:
-            if kw in line:
-                low_hits.append({'keyword': kw, 'sentence': line[:60]})
-
-    # 检查最后一句是否含钩子标记
-    last_has_hook = any(kw in last_sentence for kw in CLIFFHANGER_HIGH_MARKERS)
-    last_is_low = any(kw in last_sentence for kw in CLIFFHANGER_LOW_MARKERS)
-
-    # 评分算法
-    high_count = len(high_hits)
-    low_count = len(low_hits)
-
-    # 基础分：高潮标记越多越好
-    base_score = min(70, high_count * 15)
-    # 最后一句含钩子 +20
-    if last_has_hook:
-        base_score += 25
-    # 平淡标记扣分
-    base_score -= low_count * 10
-    # 最后一句是平淡收尾 — 重扣
-    if last_is_low:
-        base_score -= 20
-
-    hook_score = max(5, min(100, base_score))
-
-    # 切点质量判定
-    if hook_score >= 70:
-        cut_quality = 'excellent'
-    elif hook_score >= 45:
-        cut_quality = 'good'
-    elif hook_score >= 25:
-        cut_quality = 'weak'
-    else:
-        cut_quality = 'poor'
-
-    # 诊断建议
-    if cut_quality == 'excellent':
-        diagnosis = '尾部钩子强劲。切点精准卡在高潮处，读者翻页欲望极强。'
-        suggestion = '保持当前断章节奏，最后一句话的悬念感是本书的核心竞争力。'
-    elif cut_quality == 'good':
-        diagnosis = '尾部钩子有效。存在悬念元素，但可在最后一句进一步加强。'
-        suggestion = '建议：将本章最强冲突的揭示精准放在最后一句话，推迟"后果/反应"到下一章。'
-    elif cut_quality == 'weak':
-        diagnosis = '尾部钩子微弱。读者翻页欲望较低，存在平铺直叙的收尾倾向。'
-        suggestion = '建议：在此处切断章节，将反派的推门、主角的震惊、危机的降临卡在最后一句话，刺激读者点下一章。'
-    else:
-        diagnosis = '尾部钩子缺失。结尾属于平淡日常交代，读者大概率在此处弃书。'
-        suggestion = '紧急建议：删除最后3句日常收尾，改用"突然/就在这时/[角色]猛地发现/[关键信息]赫然出现"型句式结尾。例："他推开门——瞳孔骤然收缩。"'
-
-    return {
-        'hook_score': hook_score,
-        'cut_quality': cut_quality,
-        'last_sentence_hook': last_has_hook,
-        'high_markers_hit': high_hits[-8:],
-        'low_markers_hit': low_hits[-8:],
-        'last_sentence': last_sentence[:80],
-        'diagnosis': diagnosis,
-        'suggestion': suggestion
-    }
-
-
-def realism_radar(content):
-    """生存逻辑与写实度审计：检测文本是否滑向无脑爽文。
-
-    Returns:
-        dict: {
-            realism_score: 0-100 综合写实度评分,
-            power_fantasy_risk: 0-100 爽文风险,
-            environment_pressure: 0-100 环境压力感知,
-            cognitive_gap: 0-100 认知鸿沟保持度,
-            diagnosis: str 诊断建议,
-            warning: bool 是否需要告警,
-            hits: {fantasy, env, gap} 各类别关键词命中详情
-        }
-    """
-    if not content or not content.strip():
-        return {
-            'realism_score': 50, 'power_fantasy_risk': 0,
-            'environment_pressure': 0, 'cognitive_gap': 0,
-            'diagnosis': '暂无足够文本进行写实度分析', 'warning': False,
-            'hits': {'fantasy': [], 'env': [], 'gap': []}
-        }
-
-    paragraphs = [p.strip() for p in content.split('\n') if p.strip()]
-    total_chars = len(content)
-    para_count = max(len(paragraphs), 1)
-
-    # 收集各类关键词命中
-    fantasy_hits = []
-    env_hits = []
-    gap_hits = []
-
-    for para in paragraphs:
-        for kw in POWER_FANTASY_MARKERS:
-            if kw in para:
-                fantasy_hits.append({'keyword': kw, 'text': para[:60]})
-        for kw in ENVIRONMENT_PRESSURE_MARKERS:
-            if kw in para:
-                env_hits.append({'keyword': kw, 'text': para[:60]})
-        for kw in COGNITIVE_GAP_MARKERS:
-            if kw in para:
-                gap_hits.append({'keyword': kw, 'text': para[:60]})
-
-    # 计算原始分数
-    fantasy_count = len(fantasy_hits)
-    env_count = len(env_hits)
-    gap_count = len(gap_hits)
-
-    # 爽文风险：命中密度归一化（指数映射避免线性膨胀）
-    fantasy_density = fantasy_count / para_count
-    power_fantasy_risk = min(100, int(fantasy_density * 40))
-
-    # 环境压力：总字数中的环境/生理描写密度
-    env_density = env_count / max(total_chars / 100, 1)
-    environment_pressure = min(100, int(env_density * 60))
-
-    # 认知鸿沟：信息不对称标记密度
-    gap_density = gap_count / max(total_chars / 100, 1)
-    cognitive_gap = min(100, int(gap_density * 50))
-
-    # 综合写实度评分
-    raw_score = environment_pressure * 1.2 + cognitive_gap * 0.8 - power_fantasy_risk * 0.7
-    realism_score = max(0, min(100, int(raw_score)))
-
-    # 诊断建议
-    diagnosis = ''
-    warning = False
-
-    if power_fantasy_risk > 60 and environment_pressure < 30:
-        warning = True
-        diagnosis = (
-            '逻辑质感警告：当前情节有滑入"无脑爽文"风险。'
-            '环境压力感知不足、配角存在降智倾向。'
-            '建议：增加环境细节白描、放大人物之间的认知鸿沟、'
-            '让角色的每个决策建立在有限信息之上。'
-        )
-    elif power_fantasy_risk > 40:
-        diagnosis = '注意爽文倾向抬头，建议增强环境残酷度和角色生存压力描写。'
-    elif environment_pressure > 50 and cognitive_gap > 40:
-        diagnosis = '写实度良好。环境压力与认知鸿沟保持到位，硬核质感合格。'
-    elif environment_pressure < 20:
-        diagnosis = '环境压力描写偏弱。建议增加五感细节（温度/气味/触感/疼痛/疲惫）。'
-    else:
-        diagnosis = '写实度中等。可进一步强化信息不对称和生理限制描写。'
-
-    return {
-        'realism_score': realism_score,
-        'power_fantasy_risk': power_fantasy_risk,
-        'environment_pressure': environment_pressure,
-        'cognitive_gap': cognitive_gap,
-        'diagnosis': diagnosis,
-        'warning': warning,
-        'hits': {
-            'fantasy': fantasy_hits[-10:],
-            'env': env_hits[-10:],
-            'gap': gap_hits[-10:]
-        }
-    }
-
-
-def analyze_rhythm(content):
-    """分析正文的冲突/悬念/爽点/信息密度"""
-    if not content or not content.strip():
-        return {
-            'conflict': 0, 'suspense': 0, 'pleasure': 0, 'info': 0,
-            'total_chars': 0, 'segments': []
-        }
-
-    lines = content.split('\n')
-    total_chars = len(content)
-    segments = []
-
-    # 按段落分析
-    current_segment = ''
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            if current_segment:
-                segments.append(current_segment)
-                current_segment = ''
-        else:
-            current_segment += stripped
-
-    if current_segment:
-        segments.append(current_segment)
-
-    if not segments:
-        # 如果只有一个大段落，拆分为 4 段
-        chunk_size = max(1, len(lines) // 4)
-        for i in range(0, len(lines), chunk_size):
-            seg = '\n'.join(lines[i:i + chunk_size]).strip()
-            if seg:
-                segments.append(seg)
-
-    # 按段落计算密度
-    segment_scores = []
-    for seg in segments:
-        seg_lower = seg.lower()
-        conflict = sum(1 for kw in CONFLICT_KEYWORDS if kw in seg)
-        suspense = sum(1 for kw in SUSPENSE_KEYWORDS if kw in seg)
-        pleasure = sum(1 for kw in PLEASURE_KEYWORDS if kw in seg)
-        info = sum(1 for kw in INFO_KEYWORDS if kw in seg)
-        segment_scores.append({
-            'conflict': conflict, 'suspense': suspense,
-            'pleasure': pleasure, 'info': info,
-            'chars': len(seg)
-        })
-
-    # 归一化到 0-100
-    def normalize(scores, key):
-        vals = [s[key] for s in scores]
-        max_v = max(vals) if vals else 1
-        if max_v == 0:
-            return [0] * len(vals)
-        return [min(100, round(v / max_v * 100)) for v in vals]
-
-    conflict_norm = normalize(segment_scores, 'conflict')
-    suspense_norm = normalize(segment_scores, 'suspense')
-    pleasure_norm = normalize(segment_scores, 'pleasure')
-    info_norm = normalize(segment_scores, 'info')
-
-    return {
-        'conflict': round(sum(conflict_norm) / max(1, len(conflict_norm))),
-        'suspense': round(sum(suspense_norm) / max(1, len(suspense_norm))),
-        'pleasure': round(sum(pleasure_norm) / max(1, len(pleasure_norm))),
-        'info': round(sum(info_norm) / max(1, len(info_norm))),
-        'total_chars': total_chars,
-        'segments': [
-            {'conflict': conflict_norm[i], 'suspense': suspense_norm[i],
-             'pleasure': pleasure_norm[i], 'info': info_norm[i]}
-            for i in range(len(segment_scores))
-        ]
-    }
 
 
 @app.route('/api/projects/<project_id>/ai/analyze-rhythm', methods=['POST'])
@@ -2020,102 +2074,6 @@ def api_predict_retention(project_id):
         return jsonify({'error': f'预测失败: {str(e)}'})
 
 
-# ===== 去 AI 味高级滤镜引擎 =====
-DEAI_CLICHE_BANK = {
-    'despair': {
-        'label': '绝望感/抽象套话',
-        'icon': '🌫️',
-        'words': [
-            '仿佛', '那一刻', '史诗般', '如同一场饕餮盛宴', '博弈', '拉满',
-            '如同', '宛若', '仿佛间', '恍若', '恰似', '犹如',
-            '盛宴', '饕餮', '史诗', '级', '天花板', '降维打击',
-            '维度', '底层逻辑', '闭环', '赋能', '抓手',
-        ],
-    },
-    'action': {
-        'label': '动作/表情套话',
-        'icon': '🎭',
-        'words': [
-            '嘴角微微上扬', '眼神闪过一丝阴翳', '倒吸一口凉气',
-            '眼中闪过一抹', '瞳孔微缩', '眉头微蹙', '眸光一黯',
-            '嘴角勾起', '眼中寒光一闪', '面色一沉', '眼神一凛',
-            '嘴角微扬', '眼中闪过一丝', '嘴角一抽', '眉头一皱',
-            '微微一愣', '面色微变', '心中一沉', '心头一紧',
-            '眼中掠过', '嘴角泛起', '眼眸中闪过', '眼中浮现',
-            '不由一愣', '心头一跳', '脸色一变', '神色一变',
-        ],
-    },
-    'fluff': {
-        'label': '废话/总结文学',
-        'icon': '💬',
-        'words': [
-            '总而言之', '不可否认的是', '正如我们所知道的',
-            '综上所述', '值得注意的是', '需要强调的是',
-            '毫无疑问', '显而易见', '众所周知', '不言而喻',
-            '值得注意的是', '不得不承认', '必须指出',
-            '事实上', '其实', '严格来说', '确切地说',
-            '然而', '此外', '总之', '因此', '所以',
-            '从某种程度上说', '在某种意义上',
-        ],
-    },
-    'godview': {
-        'label': '上帝视角/全知总结',
-        'icon': '👁️',
-        'words': [
-            '一切都', '从此以后', '命运的安排', '冥冥之中',
-            '谁知道', '谁能想到', '令人意想不到的是',
-            '这注定', '命运的齿轮', '历史的车轮',
-            '多年以后', '回想起来', '后来才知道',
-        ],
-    },
-}
-
-
-def scan_cliches(content):
-    """多维度扫描正文中的 AI 味套话"""
-    if not content or not content.strip():
-        return {'hits': {}, 'total': 0, 'summary': ''}
-
-    hits = {}
-    text = content
-    for cat_key, cat_data in DEAI_CLICHE_BANK.items():
-        cat_hits = []
-        for word in cat_data['words']:
-            count = text.count(word)
-            if count > 0:
-                # 找到所有出现位置
-                positions = []
-                idx = text.find(word)
-                while idx != -1:
-                    # 获取周围上下文
-                    start = max(0, idx - 10)
-                    end = min(len(text), idx + len(word) + 15)
-                    snippet = text[start:end].replace('\n', ' ')
-                    positions.append({'pos': idx, 'snippet': snippet.strip()})
-                    idx = text.find(word, idx + 1)
-                cat_hits.append({'word': word, 'count': count, 'positions': positions[:3]})
-
-        if cat_hits:
-            hits[cat_key] = {
-                'label': cat_data['label'],
-                'icon': cat_data['icon'],
-                'total': sum(h['count'] for h in cat_hits),
-                'items': cat_hits,
-            }
-
-    total_hits = sum(v['total'] for v in hits.values())
-
-    # 生成摘要
-    parts = []
-    for cat_key, cat_data in sorted(hits.items(), key=lambda x: -x[1]['total']):
-        parts.append(f'{cat_data["icon"]} {cat_data["label"]}：{cat_data["total"]} 次')
-
-    return {
-        'hits': hits,
-        'total': total_hits,
-        'summary': ' | '.join(parts) if parts else '✓ 未命中套话黑名单',
-        'categories': list(hits.keys()),
-    }
 
 
 @app.route('/api/projects/<project_id>/ai/deai-check', methods=['POST'])
@@ -2230,6 +2188,66 @@ def _build_rag_context(project_id, current_content='', max_context_chars=3000):
 # 保留原有函数，作为基础上下文提供者
 def build_context_package(project_id):
     """构建结构化上下文包，用于注入 AI prompt"""
+    # Supabase 模式：从数据仓库获取
+    repo = get_repo()
+    if repo:
+        # 获取摘要（含章节信息）
+        summaries = repo.list_chapter_summaries(project_id, limit=5)
+        # 为每个摘要附加章节标题（从 chapters 表获取）
+        chapters_map = {}
+        if summaries:
+            chapters_list = repo.list_chapters(project_id)
+            chapters_map = {c['id']: c for c in chapters_list} if chapters_list else {}
+
+        threads = repo.list_plot_threads(project_id)
+        char_states = repo.list_character_states(project_id)
+        events = repo.list_key_events(project_id, limit=10)
+        all_chars = repo.list_characters(project_id)
+
+        # 格式化输出
+        parts = []
+
+        if summaries:
+            parts.append('【前文摘要】')
+            for s in reversed(summaries):
+                ch = chapters_map.get(s.get('chapter_id', ''), {})
+                title = ch.get('title', f'章节{s.get("chapter_id", "")}')
+                parts.append(f'《{title}》：{s.get("summary", "")}')
+
+        if threads:
+            parts.append('\n【活跃情节线程】')
+            for t in threads:
+                parts.append(f'- {t.get("title", "")}（{t.get("thread_type", "")}）：{t.get("description", "")}')
+
+        if char_states:
+            parts.append('\n【角色当前状态】')
+            char_name_map = {c['id']: c.get('name', '') for c in all_chars} if all_chars else {}
+            for cs in char_states:
+                name = char_name_map.get(cs.get('character_id', ''), cs.get('character_id', '未知'))
+                detail = f'{name}：{cs.get("status", "")}'
+                if cs.get('location'):
+                    detail += f'，位置：{cs.get("location")}'
+                if cs.get('emotional_state'):
+                    detail += f'，情绪：{cs.get("emotional_state")}'
+                if cs.get('knowledge_gained'):
+                    detail += f'，已知：{cs.get("knowledge_gained")}'
+                parts.append(f'- {detail}')
+
+        if events:
+            parts.append('\n【近期关键事件】')
+            for e in events:
+                involved = e.get('involved_characters', '')
+                if isinstance(involved, str) and involved.strip():
+                    try:
+                        involved = json.loads(involved)
+                        involved = '、'.join(involved) if isinstance(involved, list) else involved
+                    except json.JSONDecodeError:
+                        pass
+                parts.append(f'- {e.get("title", "")}（{e.get("event_type", "")}）：{e.get("description", "")}'
+                              f'{f" [涉及：{involved}]" if involved else ""}')
+
+        return '\n'.join(parts)
+
     conn = get_db(project_id)
 
     # 最近章节摘要（最新5章）
@@ -2326,6 +2344,12 @@ WORLDBUILDING_CATEGORIES = {
 def api_list_worldbuilding(project_id):
     """列出世界观条目，支持按分类过滤"""
     cat = request.args.get('category', '')
+
+    repo = get_repo()
+    if repo:
+        items = repo.list_worldbuilding(project_id, cat if cat else None)
+        return jsonify({'categories': WORLDBUILDING_CATEGORIES, 'items': items})
+
     conn = get_db(project_id)
     if cat and cat in WORLDBUILDING_CATEGORIES:
         rows = conn.execute(
@@ -2346,6 +2370,19 @@ def api_create_worldbuilding(project_id):
     category = data.get('category', 'other')
     if category not in WORLDBUILDING_CATEGORIES:
         category = 'other'
+
+    repo = get_repo()
+    if repo:
+        wid = repo.create_worldbuilding_entry(project_id, {
+            'category': category, 'name': name,
+            'description': data.get('description', ''),
+            'details': data.get('details', {}),
+            'sort_order': 0,
+        })
+        if wid:
+            return jsonify({'id': wid})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     wid = secrets.token_hex(8)
     conn = get_db(project_id)
@@ -2363,6 +2400,19 @@ def api_create_worldbuilding(project_id):
 def api_update_worldbuilding(project_id, item_id):
     """更新世界观条目"""
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        update_data = {}
+        for key in ['name', 'description', 'details', 'category']:
+            if key in data:
+                update_data[key] = data[key]
+        if update_data:
+            _, err = repo.update_worldbuilding_entry(item_id, update_data)
+            if err:
+                return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     fields = []
     values = []
@@ -2385,6 +2435,13 @@ def api_update_worldbuilding(project_id, item_id):
 @app.route('/api/projects/<project_id>/worldbuilding/<item_id>', methods=['DELETE'])
 def api_delete_worldbuilding(project_id, item_id):
     """删除世界观条目"""
+    repo = get_repo()
+    if repo:
+        _, err = repo.delete_worldbuilding_entry(item_id)
+        if err:
+            return jsonify({'error': '删除失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     conn.execute('DELETE FROM worldbuilding WHERE id = ?', (item_id,))
     conn.commit()
@@ -2393,6 +2450,23 @@ def api_delete_worldbuilding(project_id, item_id):
 
 def _build_world_context(project_id):
     """构建世界观上下文，用于注入 AI prompt"""
+    # Supabase 模式：从数据仓库获取
+    repo = get_repo()
+    if repo:
+        items = repo.list_worldbuilding(project_id)
+        if not items:
+            return ''
+        parts = ['【世界观设定】请严格遵守以下世界观设定：']
+        current_cat = None
+        for item in items:
+            cat = item.get('category', '')
+            if cat != current_cat:
+                current_cat = cat
+                parts.append(f'\n{WORLDBUILDING_CATEGORIES.get(cat, cat)}：')
+            desc = item.get('description') or ''
+            parts.append(f'- {item.get("name", "")}：{desc[:200]}')
+        return '\n'.join(parts)
+
     conn = get_db(project_id)
     items = conn.execute('SELECT * FROM worldbuilding ORDER BY category, sort_order').fetchall()
     conn.close()
@@ -2427,12 +2501,27 @@ def api_check_setting_consistency(project_id):
     if not world_ctx:
         return jsonify({'content': '暂无世界观设定条目。请先在「世界观」页面创建地理、势力、能力体系等设定，再进行一致性检查。'})
 
-    conn = get_db(project_id)
-    chars = conn.execute('SELECT name, gender, age, personality, background FROM characters').fetchall()
-    conn.close()
+    # 获取角色信息
+    repo = get_repo()
     char_ctx = ''
-    if chars:
-        char_ctx = '\n'.join(f'{c["name"]}（{c["gender"] or ""}，{c["age"] or ""}岁，{c["personality"] or ""}，{c["background"] or ""}）' for c in chars)
+    if repo:
+        chars_data = repo.list_characters(project_id)
+        if chars_data:
+            char_ctx = '\n'.join(
+                f'{c.get("name", "")}（{c.get("gender") or ""}，{c.get("age") or ""}岁，'
+                f'{c.get("personality") or ""}，{c.get("background") or ""}）'
+                for c in chars_data
+            )
+    else:
+        conn = get_db(project_id)
+        chars = conn.execute('SELECT name, gender, age, personality, background FROM characters').fetchall()
+        conn.close()
+        if chars:
+            char_ctx = '\n'.join(
+                f'{c["name"]}（{c["gender"] or ""}，{c["age"] or ""}岁，'
+                f'{c["personality"] or ""}，{c["background"] or ""}）'
+                for c in chars
+            )
 
     sys_prompt = (
         '你是一位严格的小说设定审核官。请将以下正文内容与世界观设定逐条比对，找出所有矛盾或不一致之处。\n\n'
@@ -2478,6 +2567,102 @@ def api_summarize_chapter(project_id, chapter_id):
     """AI 生成章节摘要、关键事件、角色状态"""
     if not check_feature('premium'):
         return jsonify({'error': '章节摘要为高级功能，请升级会员'}), 403
+
+    repo = get_repo()
+
+    # Supabase 模式
+    if repo:
+        chapter = repo.get_chapter(chapter_id)
+        if not chapter:
+            return jsonify({'error': '章节不存在'}), 404
+        content = chapter.get('content') or ''
+        if len(content.strip()) < 100:
+            return jsonify({'error': '章节内容太少，无法生成摘要'}), 400
+
+        chars = repo.list_characters(project_id)
+        char_list = '\n'.join(f'{c.get("name", "")}（{c.get("personality") or ""}）' for c in chars) if chars else '暂无角色'
+
+        threads = repo.list_plot_threads(project_id)
+        thread_list = '\n'.join(
+            f'- {t.get("title", "")}（{t.get("thread_type", "")}）：{t.get("description", "")}'
+            for t in threads if t.get('status') == 'active'
+        ) if threads else '暂无'
+
+        sample = content[:5000]
+
+        messages = [{
+            'role': 'system',
+            'content': '''你是小说结构分析师。请分析章节内容并输出 JSON：
+
+{
+  "summary": "200字以内的章节摘要",
+  "key_events": [
+    {"title": "事件标题", "description": "描述", "event_type": "revelation|conflict|turning_point|character_moment|setup|payoff", "involved_characters": ["角色名"]}
+  ],
+  "character_states": {
+    "角色名": {"status": "alive|injured|missing|dead", "location": "地点", "emotional_state": "情绪", "knowledge_gained": "新获得的信息"}
+  },
+  "plot_threads_affected": ["受影响的情节线程标题"]
+}
+
+直接输出 JSON，不含其他内容。'''
+        }, {
+            'role': 'user',
+            'content': f'角色列表：\n{char_list}\n\n已有情节线程：\n{thread_list}\n\n章节标题：{chapter.get("title", "")}\n\n章节内容：\n{sample}'
+        }]
+
+        result = call_ai(messages, temperature=0.3, max_tokens=2000)
+        try:
+            cleaned = result.replace('```json', '').replace('```', '').strip()
+            parsed = json.loads(cleaned)
+        except (json.JSONDecodeError, AttributeError):
+            return jsonify({'content': result, 'parsed': False})
+
+        now = datetime.now().isoformat()
+        summary = parsed.get('summary', result[:300])
+        key_events = parsed.get('key_events', [])
+        char_states = parsed.get('character_states', {})
+
+        # 存储摘要
+        repo.upsert_chapter_summary(project_id, chapter_id, {
+            'summary': summary,
+            'key_events': json.dumps(key_events, ensure_ascii=False),
+            'character_states': json.dumps(char_states, ensure_ascii=False),
+            'plot_threads': json.dumps(parsed.get('plot_threads_affected', []), ensure_ascii=False),
+            'word_count': chapter.get('word_count', 0),
+        })
+
+        # 存储关键事件
+        for ev in key_events:
+            repo.create_key_event(project_id, {
+                'chapter_id': chapter_id,
+                'title': ev.get('title', ''),
+                'description': ev.get('description', ''),
+                'event_type': ev.get('event_type', 'event'),
+                'involved_characters': json.dumps(ev.get('involved_characters', []), ensure_ascii=False),
+            })
+
+        # 存储角色状态
+        for char_name, state in char_states.items():
+            # 查找角色 ID
+            char_id = None
+            for c in chars:
+                if c.get('name') == char_name:
+                    char_id = c.get('id')
+                    break
+            if char_id:
+                repo.upsert_character_state(project_id, {
+                    'character_id': char_id,
+                    'chapter_id': chapter_id,
+                    'location': state.get('location', ''),
+                    'status': state.get('status', 'alive'),
+                    'emotional_state': state.get('emotional_state', ''),
+                    'knowledge_gained': state.get('knowledge_gained', ''),
+                    'relationships': json.dumps(state.get('relationships', {}), ensure_ascii=False),
+                })
+
+        return jsonify({'success': True, 'summary': summary, 'event_count': len(key_events), 'parsed': True})
+
     conn = get_db(project_id)
     chapter = conn.execute('SELECT * FROM chapters WHERE id = ?', (chapter_id,)).fetchone()
     if not chapter:
@@ -2581,6 +2766,33 @@ def api_get_context(project_id):
     # 从 query string 获取当前内容用于关键词提取
     current_text = request.args.get('current_text', '')
     context = _build_rag_context(project_id, current_text) if current_text else build_context_package(project_id)
+
+    # Supabase 模式：上下文已由 build_* 函数构建，额外数据从 repo 获取
+    repo = get_repo()
+    if repo:
+        summaries = repo.list_chapter_summaries(project_id, limit=50)
+        # 为摘要附加章节标题
+        chapters_list = repo.list_chapters(project_id)
+        chapters_map = {c['id']: c for c in chapters_list} if chapters_list else {}
+        for s in summaries:
+            ch = chapters_map.get(s.get('chapter_id', ''), {})
+            s['chapter_title'] = ch.get('title', '')
+            s['sort_order'] = ch.get('sort_order', 0)
+
+        threads = repo.list_plot_threads(project_id)
+        events = repo.list_key_events(project_id, limit=50)
+        # 为事件附加章节标题
+        for e in events:
+            ch = chapters_map.get(e.get('chapter_id', ''), {})
+            e['chapter_title'] = ch.get('title', '')
+
+        return jsonify({
+            'context_text': context,
+            'summaries': summaries,
+            'plot_threads': threads,
+            'key_events': events
+        })
+
     conn = get_db(project_id)
     summaries = conn.execute('''
         SELECT cs.*, c.title as chapter_title, c.sort_order
@@ -2606,6 +2818,11 @@ def api_get_context(project_id):
 def api_list_plot_threads(project_id):
     if not check_feature('premium'):
         return jsonify({'error': '情节线程为高级功能，请升级会员'}), 403
+
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_plot_threads(project_id))
+
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM plot_threads ORDER BY created_at').fetchall()
     conn.close()
@@ -2616,6 +2833,14 @@ def api_create_plot_thread(project_id):
     if not check_feature('premium'):
         return jsonify({'error': '情节线程为高级功能，请升级会员'}), 403
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        tid = repo.create_plot_thread(project_id, data)
+        if tid:
+            return jsonify({'id': tid})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     tid = secrets.token_hex(8)
     conn = get_db(project_id)
@@ -2634,6 +2859,14 @@ def api_update_plot_thread(project_id, thread_id):
     if not check_feature('premium'):
         return jsonify({'error': '情节线程为高级功能，请升级会员'}), 403
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        _, err = repo.update_plot_thread(thread_id, data)
+        if err:
+            return jsonify({'error': '更新失败'}), 500
+        return jsonify({'success': True})
+
     conn = get_db(project_id)
     fields = []
     values = []
@@ -2671,6 +2904,10 @@ def api_list_key_events(project_id):
 
 @app.route('/api/projects/<project_id>/ai/conversations', methods=['GET'])
 def api_list_conversations(project_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_conversations(project_id))
+
     category = request.args.get('category', '')
     conn = get_db(project_id)
     if category:
@@ -2683,6 +2920,19 @@ def api_list_conversations(project_id):
 @app.route('/api/projects/<project_id>/ai/conversations', methods=['POST'])
 def api_create_conversation(project_id):
     data = request.json
+
+    repo = get_repo()
+    if repo:
+        conv_id = repo.create_conversation(
+            project_id,
+            category=data.get('category', 'general'),
+            topic=data.get('topic', ''),
+            source_tab=data.get('source_tab', 'chat')
+        )
+        if conv_id:
+            return jsonify({'id': conv_id})
+        return jsonify({'error': '创建失败'}), 500
+
     now = datetime.now().isoformat()
     conv_id = secrets.token_hex(8)
     conn = get_db(project_id)
@@ -2697,6 +2947,10 @@ def api_create_conversation(project_id):
 
 @app.route('/api/projects/<project_id>/ai/conversations/<conv_id>/messages', methods=['GET'])
 def api_get_conversation_messages(project_id, conv_id):
+    repo = get_repo()
+    if repo:
+        return jsonify(repo.list_messages(conv_id))
+
     conn = get_db(project_id)
     rows = conn.execute('SELECT * FROM ai_messages WHERE conversation_id = ? ORDER BY id', (conv_id,)).fetchall()
     conn.close()
@@ -2707,26 +2961,29 @@ def api_add_conversation_message(project_id, conv_id):
     data = request.json
     role = data.get('role', 'user')
     content = data.get('content', '')
-    now = datetime.now().isoformat()
 
+    repo = get_repo()
+    if repo:
+        ok = repo.add_message(project_id, conv_id, role, content)
+        if ok:
+            return jsonify({'success': True})
+        return jsonify({'error': '添加消息失败'}), 500
+
+    now = datetime.now().isoformat()
     conn = get_db(project_id)
     conn.execute('''
         INSERT INTO ai_messages (conversation_id, role, content, timestamp)
         VALUES (?, ?, ?, ?)
     ''', (conv_id, role, content, now))
 
-    # 更新对话元数据
     msg_count = conn.execute('SELECT COUNT(*) as cnt FROM ai_messages WHERE conversation_id = ?', (conv_id,)).fetchone()['cnt']
 
-    # 如果刚添加了用户消息，尝试自动归类
     if role == 'user' and msg_count <= 4:
-        # 取最近几条消息用于归类
         recent = conn.execute(
             'SELECT content FROM ai_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 4', (conv_id,)
         ).fetchall()
         sample = ' | '.join(r['content'][:200] for r in reversed(recent))
 
-        # 用简单规则预分类，避免每个消息都调 AI
         categories = {
             '角色': 'character', '人物': 'character', '性格': 'character',
             '情节': 'plot', '剧情': 'plot', '故事': 'plot', '冲突': 'plot',
@@ -2740,7 +2997,6 @@ def api_add_conversation_message(project_id, conv_id):
                 detected = cat
                 break
 
-        # 每6条消息后调用 AI 精确归类
         if msg_count % 6 == 0:
             try:
                 classify_prompt = f'将以下小说写作对话归类为一个类别：plot(情节), character(角色), worldbuilding(世界观), writing_style(文笔), revision(修改), general(通用)。只输出类别英文名。\n对话片段：{sample[:300]}'
@@ -2749,13 +3005,12 @@ def api_add_conversation_message(project_id, conv_id):
                 valid_cats = ['plot', 'character', 'worldbuilding', 'writing_style', 'revision', 'general']
                 if ai_cat in valid_cats:
                     detected = ai_cat
-                # 提取主题
                 topic_prompt = f'为这段写作对话生成一个简短主题标签（最多10个字）：{sample[:200]}'
                 topic = call_ai([{'role': 'user', 'content': topic_prompt}], temperature=0.3, max_tokens=30)
                 topic = topic.strip()[:15]
                 conn.execute('UPDATE ai_conversations SET topic = ? WHERE id = ?', (topic, conv_id))
             except Exception:
-                pass  # 归类失败不影响主流程
+                pass
 
         conn.execute('UPDATE ai_conversations SET category = ? WHERE id = ?', (detected, conv_id))
 
@@ -4408,7 +4663,24 @@ init_license_db()
 # ===== 充值模式：用户标识 =====
 
 def get_user_id():
-    """获取当前用户的唯一标识（设备级，无需注册）"""
+    """获取当前用户的唯一标识。
+    Supabase 模式：使用 JWT 中的 user_id（多租户隔离）
+    SQLite 模式：使用设备级随机 ID（本地单机）
+    """
+    # 优先使用 Supabase JWT 用户
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        uid = get_current_user_id()
+        if uid:
+            return uid
+        # 降级：Supabase 配置了但 JWT 缺失 → 创建匿名 ID
+        uid = _get_or_create_anonymous_id()
+        return uid
+
+    # SQLite 本地模式
+    return _get_or_create_anonymous_id()
+
+def _get_or_create_anonymous_id():
+    """SQLite 本地模式：创建/获取设备级匿名 ID"""
     conn = sqlite3.connect(str(LICENSE_DB))
     conn.row_factory = sqlite3.Row
     row = conn.execute("SELECT value FROM license_config WHERE key = 'user_id'").fetchone()
@@ -4419,7 +4691,6 @@ def get_user_id():
     conn.execute('INSERT OR IGNORE INTO license_config (key, value) VALUES (?, ?)', ('user_id', user_id))
     conn.commit()
     conn.close()
-    # 确保该用户有余额记录
     _ensure_balance_record(user_id)
     return user_id
 
@@ -4489,6 +4760,13 @@ MODEL_META = {
 
 def _get_user_tier(user_id):
     """根据用户累计充值金额确定套餐等级"""
+    # Supabase 模式：从 users 表读取
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        repo = get_repo()
+        if repo:
+            tier = repo.get_user_tier()
+            return tier
+
     conn = sqlite3.connect(str(LICENSE_DB))
     conn.row_factory = sqlite3.Row
     row = conn.execute('SELECT COALESCE(total_recharged, 0) as total FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
@@ -4517,12 +4795,22 @@ def api_user_tier():
     available_models = tier_info['models']
     tier_info['models_detail'] = [dict(MODEL_META[m], id=m) for m in available_models]
     # 充值信息
-    conn = sqlite3.connect(str(LICENSE_DB))
-    conn.row_factory = sqlite3.Row
-    row = conn.execute('SELECT total_recharged, balance FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
-    conn.close()
-    tier_info['total_recharged'] = round(row['total_recharged'] or 0, 2) if row else 0
-    tier_info['balance'] = round(row['balance'] or 0, 2) if row else 0
+    # Supabase 模式：余额系统尚未集成，返回默认值
+    total_recharged = 0.0
+    balance = 0.0
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        # TODO: 将 user_balances 表迁移到 Supabase 后启用真实余额查询
+        pass
+    else:
+        conn = sqlite3.connect(str(LICENSE_DB))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute('SELECT total_recharged, balance FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
+        conn.close()
+        total_recharged = round(row['total_recharged'] or 0, 2) if row else 0
+        balance = round(row['balance'] or 0, 2) if row else 0
+
+    tier_info['total_recharged'] = total_recharged
+    tier_info['balance'] = balance
     tier_info['next_tier'] = None
     if tier == 'free':
         tier_info['next_tier'] = 'basic'
@@ -4566,6 +4854,13 @@ def api_admin_save_key():
 
 def _has_paid(user_id):
     """用户是否充过值"""
+    # Supabase 模式：检查 user_tier（非 free 即为付费用户）
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        repo = get_repo()
+        if repo:
+            tier = repo.get_user_tier()
+            return tier != 'free'
+
     conn = sqlite3.connect(str(LICENSE_DB))
     conn.row_factory = sqlite3.Row
     row = conn.execute('SELECT total_recharged FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
@@ -4647,16 +4942,23 @@ def get_current_license():
     return dict(lic) if lic else None
 
 def check_feature(feature, value=None):
-    """余额模式下的功能门控"""
+    """余额模式下的功能门控（Supabase 模式从 users 表读取等级）"""
     user_id = get_user_id()
     paid = _has_paid(user_id)
 
     if feature == 'create_project':
+        # Supabase 模式：RLS 自动限制，不在此处计数
+        if _HAS_SUPABASE_REPO and is_supabase_mode():
+            return True
         proj_count = len([p for p in PROJECTS_DIR.iterdir() if p.is_dir() and (p / 'novel.db').exists()])
         limit = 50 if paid else 1
         return proj_count < limit
 
     if feature == 'ai_call':
+        # Supabase 模式：余额系统尚未集成到 Supabase，暂允许所有调用
+        # TODO: 将余额/充值系统迁移到 Supabase 后启用真实校验
+        if _HAS_SUPABASE_REPO and is_supabase_mode():
+            return True
         # 余额模式：只要余额 > 0 或有免费额度即可
         conn = sqlite3.connect(str(LICENSE_DB))
         conn.row_factory = sqlite3.Row
@@ -4707,6 +5009,25 @@ def log_license_action(license_id, action, detail='', conn=None):
 def license_status():
     """余额模式下的用户状态"""
     user_id = get_user_id()
+
+    # Supabase 模式：余额系统尚未集成，返回基本默认值
+    if _HAS_SUPABASE_REPO and is_supabase_mode():
+        paid = _has_paid(user_id)
+        # TODO: 将 user_balances 表迁移到 Supabase 后启用真实余额
+        return jsonify({
+            'mode': 'supabase',
+            'balance': 0.0,
+            'free_daily_credits': 0.02,
+            'free_daily_used': 0.0,
+            'free_daily_remaining': 0.02,
+            'total_recharged': 0.0,
+            'is_free_user': not paid,
+            'has_recharged': paid,
+            'projects': {'used': 0, 'limit': 50 if paid else 1},
+            'exports': ['txt', 'docx', 'pdf'] if paid else ['txt'],
+            'today_stats': {'calls': 0, 'cost': 0}
+        })
+
     conn = sqlite3.connect(str(LICENSE_DB))
     conn.row_factory = sqlite3.Row
     row = conn.execute('SELECT * FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
@@ -4925,6 +5246,7 @@ def init_purchase_table():
             status TEXT DEFAULT 'pending',
             customer_email TEXT,
             customer_name TEXT,
+            user_id TEXT,
             license_key TEXT,
             created_at TEXT,
             paid_at TEXT
@@ -5180,9 +5502,10 @@ def purchase_create():
     now = datetime.now().isoformat()
 
     conn = sqlite3.connect(str(LICENSE_DB))
+    user_id = get_user_id()
     conn.execute(
-        'INSERT INTO purchases (id, tier, amount, status, customer_email, customer_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (order_id, 'recharge', amount, 'pending', email, name, now)
+        'INSERT INTO purchases (id, tier, amount, status, customer_email, customer_name, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        (order_id, 'recharge', amount, 'pending', email, name, user_id, now)
     )
     conn.commit()
     conn.close()
@@ -5196,6 +5519,7 @@ def purchase_create():
     })
 
 @app.route('/api/purchase/confirm', methods=['POST'])
+@admin_required
 def purchase_confirm():
     """确认支付成功 → 余额充值"""
     data = request.json
@@ -5228,8 +5552,8 @@ def purchase_confirm():
         ('paid', now, order_id)
     )
 
-    # 充值到余额
-    user_id = get_user_id()
+    # 充值到用户余额
+    user_id = order['user_id'] or get_user_id()
     _ensure_balance_record(user_id, conn)
     old_balance = conn.execute('SELECT balance FROM user_balances WHERE user_id = ?', (user_id,)).fetchone()
     old_bal = old_balance['balance'] if old_balance else 0.0

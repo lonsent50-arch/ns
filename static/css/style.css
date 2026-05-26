@@ -1831,3 +1831,117 @@ body::before {
     border-color: var(--accent);
     box-shadow: 0 4px 12px rgba(124,58,237,0.15);
 }
+
+/* ================================================================
+   RESPONSIVE — Tablet (≤900px)
+   ================================================================ */
+@media (max-width: 900px) {
+    .app-container {
+        grid-template-columns: 1fr;
+    }
+    .panel-left {
+        position: fixed; left: -260px; top: 0; bottom: 0; z-index: 200;
+        width: 260px; max-width: 85vw;
+        transition: left 0.3s cubic-bezier(0.25,0.1,0.25,1);
+        background: rgba(12,12,18,0.98);
+        box-shadow: 4px 0 32px rgba(0,0,0,0.5);
+    }
+    .panel-left.open { left: 0; }
+    .panel-center { width: 100%; }
+
+    .editor-body { padding: 20px 24px; font-size: 15px; }
+    .editor-toolbar { padding: 8px 14px; }
+    .editor-toolbar .ch-title { font-size: 17px; }
+
+    .modal { max-width: 90vw; padding: 20px 18px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .pricing-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .slideout-panel { width: 380px; }
+}
+
+/* ================================================================
+   RESPONSIVE — Small Tablet / Large Phone (≤768px)
+   ================================================================ */
+@media (max-width: 768px) {
+    .brand-header { padding: 14px 16px 10px; }
+    .brand-icon { width: 30px; height: 30px; font-size: 14px; }
+    .brand-text { font-size: 15px; }
+
+    .editor-body { padding: 14px 14px; font-size: 14px; line-height: 1.7; }
+    .editor-toolbar { padding: 6px 10px; flex-wrap: wrap; gap: 6px; }
+    .editor-toolbar .ch-title { font-size: 15px; }
+    .editor-status { padding: 4px 8px; font-size: 9px; gap: 5px; }
+
+    .slideout-panel { width: 100vw; max-width: 100vw; right: -100vw; }
+    .slideout-panel.open { right: 0; }
+
+    .modal { min-width: unset; max-width: 96vw; width: 96vw; padding: 18px 14px; border-radius: var(--radius-lg); max-height: 90vh; }
+    .modal h2 { font-size: 16px; margin-bottom: 14px; }
+
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px; }
+    .stat-card { padding: 12px 8px; }
+    .stat-card .sc-value { font-size: 22px; }
+    .pricing-grid { grid-template-columns: 1fr; gap: 8px; }
+
+    .model-recharge-section { grid-template-columns: 1fr; }
+    .balance-stats { grid-template-columns: repeat(2, 1fr); }
+
+    .toast-container { top: 8px; right: 8px; left: 8px; }
+    .toast { max-width: 100%; font-size: 12px; padding: 8px 14px; }
+
+    .form-actions { flex-wrap: wrap; }
+    .form-actions .btn-danger { margin-right: 0; width: 100%; order: 3; margin-top: 6px; }
+
+    .welcome-card { width: 150px; padding: 16px 12px; }
+    .welcome-title { font-size: 19px; }
+    .welcome-desc { font-size: 13px; }
+
+    .cmd-palette { width: 96vw; }
+}
+
+/* ================================================================
+   RESPONSIVE — Phone (≤480px)
+   ================================================================ */
+@media (max-width: 480px) {
+    .brand-header { padding: 10px 12px 8px; }
+    .brand-icon { width: 26px; height: 26px; font-size: 12px; border-radius: 7px; }
+    .brand-text { font-size: 14px; }
+    .brand-sub { font-size: 10px; }
+
+    .editor-body { padding: 10px 10px; font-size: 13px; line-height: 1.65; }
+    .editor-toolbar { padding: 4px 8px; gap: 4px; }
+    .editor-toolbar .ch-title { font-size: 14px; }
+    .editor-toolbar .ch-meta { font-size: 10px; }
+
+    .btn-new-project { padding: 8px; font-size: 12px; margin: 8px 10px; width: calc(100% - 20px); }
+
+    .tree-node { padding: 6px 10px; font-size: 12.5px; margin: 1px 4px; }
+    .tree-section-header { padding: 8px 10px 4px; font-size: 11px; }
+
+    .modal { padding: 14px 10px; max-width: 98vw; width: 98vw; border-radius: 12px; }
+    .modal h2 { font-size: 15px; margin-bottom: 10px; }
+
+    .stats-grid { grid-template-columns: 1fr; gap: 6px; padding: 8px; }
+    .stat-card { padding: 10px 8px; }
+    .stat-card .sc-value { font-size: 20px; }
+    .stat-card .sc-label { font-size: 10px; }
+
+    .welcome-card { width: 130px; padding: 14px 10px; }
+    .welcome-card .wc-label { font-size: 13px; }
+    .welcome-title { font-size: 17px; }
+    .welcome-desc { font-size: 12px; padding: 0 10px; }
+    .welcome-shortcuts { gap: 8px; }
+    .welcome-kbd { font-size: 10px; padding: 4px 8px; }
+
+    .toast-container { top: 4px; right: 4px; left: 4px; }
+    .toast { font-size: 11px; padding: 6px 10px; }
+
+    .slideout-header { padding: 12px 14px; }
+    .slideout-header h3 { font-size: 13px; }
+    .slideout-body { padding: 12px 14px; }
+
+    .auth-modal-content { max-width: 100% !important; }
+    .auth-form input[type="email"],
+    .auth-form input[type="password"] { padding: 10px; font-size: 13px; }
+    .btn-auth-submit { padding: 10px; font-size: 14px; }
+}

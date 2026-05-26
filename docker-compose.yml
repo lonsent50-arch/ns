@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: novel-studio
+    restart: unless-stopped
+    ports:
+      - '${PORT:-5050}:${PORT:-5050}'
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT:-5050}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:${PORT:-5050}/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: gunicorn app:app --bind 0.0.0.0:${PORT:-5050} --workers 4 --timeout 120
