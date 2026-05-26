@@ -19,4 +19,4 @@ COPY . .
 RUN mkdir -p projects
 
 EXPOSE 5050
-CMD ["python3", "server.py"]
+CMD ["python3", "app.py"]

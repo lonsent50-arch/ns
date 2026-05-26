@@ -1,6 +1,6 @@
 -- ============================================================
--- Novel Studio — 云端多用户隔离数据库架构
--- 在 Supabase SQL Editor 中执行此脚本
+-- Novel Studio — 云端多用户隔离数据库架构（幂等版）
+-- 可重复执行，不会因 Policy/Trigger 已存在而报错
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT,
-    user_tier TEXT NOT NULL DEFAULT 'free' CHECK (user_tier IN ('free', 'pro', 'platinum')),
+    user_tier TEXT NOT NULL DEFAULT 'free' CHECK (user_tier IN ('free', 'basic', 'pro', 'premium', 'platinum')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -30,7 +30,9 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users_select_own" ON public.users;
 CREATE POLICY "users_select_own" ON public.users FOR SELECT USING (id = auth.uid());
+DROP POLICY IF EXISTS "users_update_own" ON public.users;
 CREATE POLICY "users_update_own" ON public.users FOR UPDATE USING (id = auth.uid());
 
 -- ============================================================
@@ -49,9 +51,13 @@ CREATE TABLE IF NOT EXISTS public.books (
 CREATE INDEX IF NOT EXISTS idx_books_user_id ON books(user_id);
 
 ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "books_select_own" ON public.books;
 CREATE POLICY "books_select_own" ON public.books FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "books_insert_own" ON public.books;
 CREATE POLICY "books_insert_own" ON public.books FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "books_update_own" ON public.books;
 CREATE POLICY "books_update_own" ON public.books FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "books_delete_own" ON public.books;
 CREATE POLICY "books_delete_own" ON public.books FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -74,9 +80,13 @@ CREATE INDEX IF NOT EXISTS idx_chapters_book_id ON chapters(book_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_user_id ON chapters(user_id);
 
 ALTER TABLE public.chapters ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chapters_select_own" ON public.chapters;
 CREATE POLICY "chapters_select_own" ON public.chapters FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapters_insert_own" ON public.chapters;
 CREATE POLICY "chapters_insert_own" ON public.chapters FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapters_update_own" ON public.chapters;
 CREATE POLICY "chapters_update_own" ON public.chapters FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapters_delete_own" ON public.chapters;
 CREATE POLICY "chapters_delete_own" ON public.chapters FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -101,9 +111,13 @@ CREATE INDEX IF NOT EXISTS idx_characters_book_id ON characters(book_id);
 CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id);
 
 ALTER TABLE public.characters ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "characters_select_own" ON public.characters;
 CREATE POLICY "characters_select_own" ON public.characters FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "characters_insert_own" ON public.characters;
 CREATE POLICY "characters_insert_own" ON public.characters FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "characters_update_own" ON public.characters;
 CREATE POLICY "characters_update_own" ON public.characters FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "characters_delete_own" ON public.characters;
 CREATE POLICY "characters_delete_own" ON public.characters FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -125,9 +139,13 @@ CREATE INDEX IF NOT EXISTS idx_outline_nodes_book_id ON outline_nodes(book_id);
 CREATE INDEX IF NOT EXISTS idx_outline_nodes_user_id ON outline_nodes(user_id);
 
 ALTER TABLE public.outline_nodes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "outline_select_own" ON public.outline_nodes;
 CREATE POLICY "outline_select_own" ON public.outline_nodes FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "outline_insert_own" ON public.outline_nodes;
 CREATE POLICY "outline_insert_own" ON public.outline_nodes FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "outline_update_own" ON public.outline_nodes;
 CREATE POLICY "outline_update_own" ON public.outline_nodes FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "outline_delete_own" ON public.outline_nodes;
 CREATE POLICY "outline_delete_own" ON public.outline_nodes FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -150,9 +168,13 @@ CREATE INDEX IF NOT EXISTS idx_plot_threads_book_id ON plot_threads(book_id);
 CREATE INDEX IF NOT EXISTS idx_plot_threads_user_id ON plot_threads(user_id);
 
 ALTER TABLE public.plot_threads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "plot_threads_select_own" ON public.plot_threads;
 CREATE POLICY "plot_threads_select_own" ON public.plot_threads FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "plot_threads_insert_own" ON public.plot_threads;
 CREATE POLICY "plot_threads_insert_own" ON public.plot_threads FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "plot_threads_update_own" ON public.plot_threads;
 CREATE POLICY "plot_threads_update_own" ON public.plot_threads FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "plot_threads_delete_own" ON public.plot_threads;
 CREATE POLICY "plot_threads_delete_own" ON public.plot_threads FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -174,9 +196,13 @@ CREATE INDEX IF NOT EXISTS idx_worldbuilding_book_id ON worldbuilding(book_id);
 CREATE INDEX IF NOT EXISTS idx_worldbuilding_user_id ON worldbuilding(user_id);
 
 ALTER TABLE public.worldbuilding ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "worldbuilding_select_own" ON public.worldbuilding;
 CREATE POLICY "worldbuilding_select_own" ON public.worldbuilding FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "worldbuilding_insert_own" ON public.worldbuilding;
 CREATE POLICY "worldbuilding_insert_own" ON public.worldbuilding FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "worldbuilding_update_own" ON public.worldbuilding;
 CREATE POLICY "worldbuilding_update_own" ON public.worldbuilding FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "worldbuilding_delete_own" ON public.worldbuilding;
 CREATE POLICY "worldbuilding_delete_own" ON public.worldbuilding FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -197,9 +223,13 @@ CREATE INDEX IF NOT EXISTS idx_chapter_summaries_book_id ON chapter_summaries(bo
 CREATE INDEX IF NOT EXISTS idx_chapter_summaries_user_id ON chapter_summaries(user_id);
 
 ALTER TABLE public.chapter_summaries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chapter_summaries_select_own" ON public.chapter_summaries;
 CREATE POLICY "chapter_summaries_select_own" ON public.chapter_summaries FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_summaries_insert_own" ON public.chapter_summaries;
 CREATE POLICY "chapter_summaries_insert_own" ON public.chapter_summaries FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_summaries_update_own" ON public.chapter_summaries;
 CREATE POLICY "chapter_summaries_update_own" ON public.chapter_summaries FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_summaries_delete_own" ON public.chapter_summaries;
 CREATE POLICY "chapter_summaries_delete_own" ON public.chapter_summaries FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -221,9 +251,13 @@ CREATE INDEX IF NOT EXISTS idx_key_events_book_id ON key_events(book_id);
 CREATE INDEX IF NOT EXISTS idx_key_events_user_id ON key_events(user_id);
 
 ALTER TABLE public.key_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "key_events_select_own" ON public.key_events;
 CREATE POLICY "key_events_select_own" ON public.key_events FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "key_events_insert_own" ON public.key_events;
 CREATE POLICY "key_events_insert_own" ON public.key_events FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "key_events_update_own" ON public.key_events;
 CREATE POLICY "key_events_update_own" ON public.key_events FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "key_events_delete_own" ON public.key_events;
 CREATE POLICY "key_events_delete_own" ON public.key_events FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -246,9 +280,13 @@ CREATE INDEX IF NOT EXISTS idx_character_states_book_id ON character_states(book
 CREATE INDEX IF NOT EXISTS idx_character_states_user_id ON character_states(user_id);
 
 ALTER TABLE public.character_states ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "character_states_select_own" ON public.character_states;
 CREATE POLICY "character_states_select_own" ON public.character_states FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "character_states_insert_own" ON public.character_states;
 CREATE POLICY "character_states_insert_own" ON public.character_states FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "character_states_update_own" ON public.character_states;
 CREATE POLICY "character_states_update_own" ON public.character_states FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "character_states_delete_own" ON public.character_states;
 CREATE POLICY "character_states_delete_own" ON public.character_states FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -269,9 +307,13 @@ CREATE INDEX IF NOT EXISTS idx_character_knowledge_book_id ON character_knowledg
 CREATE INDEX IF NOT EXISTS idx_character_knowledge_user_id ON character_knowledge(user_id);
 
 ALTER TABLE public.character_knowledge ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "char_knowledge_select_own" ON public.character_knowledge;
 CREATE POLICY "char_knowledge_select_own" ON public.character_knowledge FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "char_knowledge_insert_own" ON public.character_knowledge;
 CREATE POLICY "char_knowledge_insert_own" ON public.character_knowledge FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "char_knowledge_update_own" ON public.character_knowledge;
 CREATE POLICY "char_knowledge_update_own" ON public.character_knowledge FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "char_knowledge_delete_own" ON public.character_knowledge;
 CREATE POLICY "char_knowledge_delete_own" ON public.character_knowledge FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -292,9 +334,13 @@ CREATE INDEX IF NOT EXISTS idx_writing_stats_book_id ON writing_stats(book_id);
 CREATE INDEX IF NOT EXISTS idx_writing_stats_user_id ON writing_stats(user_id);
 
 ALTER TABLE public.writing_stats ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "writing_stats_select_own" ON public.writing_stats;
 CREATE POLICY "writing_stats_select_own" ON public.writing_stats FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_stats_insert_own" ON public.writing_stats;
 CREATE POLICY "writing_stats_insert_own" ON public.writing_stats FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_stats_update_own" ON public.writing_stats;
 CREATE POLICY "writing_stats_update_own" ON public.writing_stats FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_stats_delete_own" ON public.writing_stats;
 CREATE POLICY "writing_stats_delete_own" ON public.writing_stats FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -314,9 +360,13 @@ CREATE INDEX IF NOT EXISTS idx_writing_goals_book_id ON writing_goals(book_id);
 CREATE INDEX IF NOT EXISTS idx_writing_goals_user_id ON writing_goals(user_id);
 
 ALTER TABLE public.writing_goals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "writing_goals_select_own" ON public.writing_goals;
 CREATE POLICY "writing_goals_select_own" ON public.writing_goals FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_goals_insert_own" ON public.writing_goals;
 CREATE POLICY "writing_goals_insert_own" ON public.writing_goals FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_goals_update_own" ON public.writing_goals;
 CREATE POLICY "writing_goals_update_own" ON public.writing_goals FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "writing_goals_delete_own" ON public.writing_goals;
 CREATE POLICY "writing_goals_delete_own" ON public.writing_goals FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -337,9 +387,13 @@ CREATE INDEX IF NOT EXISTS idx_chapter_snapshots_chapter ON chapter_snapshots(ch
 CREATE INDEX IF NOT EXISTS idx_chapter_snapshots_user_id ON chapter_snapshots(user_id);
 
 ALTER TABLE public.chapter_snapshots ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "chapter_snapshots_select_own" ON public.chapter_snapshots;
 CREATE POLICY "chapter_snapshots_select_own" ON public.chapter_snapshots FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_snapshots_insert_own" ON public.chapter_snapshots;
 CREATE POLICY "chapter_snapshots_insert_own" ON public.chapter_snapshots FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_snapshots_update_own" ON public.chapter_snapshots;
 CREATE POLICY "chapter_snapshots_update_own" ON public.chapter_snapshots FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "chapter_snapshots_delete_own" ON public.chapter_snapshots;
 CREATE POLICY "chapter_snapshots_delete_own" ON public.chapter_snapshots FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
@@ -360,11 +414,18 @@ CREATE INDEX IF NOT EXISTS idx_ai_conversations_book_id ON ai_conversations(book
 CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_id ON ai_conversations(user_id);
 
 ALTER TABLE public.ai_conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ai_conversations_select_own" ON public.ai_conversations;
 CREATE POLICY "ai_conversations_select_own" ON public.ai_conversations FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_conversations_insert_own" ON public.ai_conversations;
 CREATE POLICY "ai_conversations_insert_own" ON public.ai_conversations FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_conversations_update_own" ON public.ai_conversations;
 CREATE POLICY "ai_conversations_update_own" ON public.ai_conversations FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_conversations_delete_own" ON public.ai_conversations;
 CREATE POLICY "ai_conversations_delete_own" ON public.ai_conversations FOR DELETE USING (user_id = auth.uid());
 
+-- ============================================================
+-- AI MESSAGES
+-- ============================================================
 CREATE TABLE IF NOT EXISTS public.ai_messages (
     id SERIAL PRIMARY KEY,
     conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
@@ -378,7 +439,11 @@ CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation ON ai_messages(conversat
 CREATE INDEX IF NOT EXISTS idx_ai_messages_user_id ON ai_messages(user_id);
 
 ALTER TABLE public.ai_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ai_messages_select_own" ON public.ai_messages;
 CREATE POLICY "ai_messages_select_own" ON public.ai_messages FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_messages_insert_own" ON public.ai_messages;
 CREATE POLICY "ai_messages_insert_own" ON public.ai_messages FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_messages_update_own" ON public.ai_messages;
 CREATE POLICY "ai_messages_update_own" ON public.ai_messages FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "ai_messages_delete_own" ON public.ai_messages;
 CREATE POLICY "ai_messages_delete_own" ON public.ai_messages FOR DELETE USING (user_id = auth.uid());
