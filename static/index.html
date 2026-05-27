@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Novel Studio">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/static/css/style.css?v=16">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
     <script>(function(){var u=navigator.userAgent;window._isCapacitor=!!(window.Capacitor||u.includes('Capacitor'));window._isIOS=/iPhone|iPad|iPod/.test(u);window._isAndroid=/Android/.test(u);document.documentElement.classList.add(window._isCapacitor?'native-app':'browser');})();</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <!-- ═══ 部署配置：前端自动解耦 API 地址 ═══ -->
@@ -40,6 +40,7 @@
             <div id="auth-area" style="margin-left:auto;display:flex;align-items:center;"></div>
         </div>
         <button class="btn-new-project" onclick="openModal('new-project-modal')">＋ 新建项目</button>
+        <button class="btn-ai-outline" onclick="quickStartOutline()">📋 AI 生成大纲</button>
 
         <!-- Quick actions -->
         <div class="sidebar-toolbar">

@@ -132,6 +132,17 @@ body::before {
 .btn-new-project:hover { background: var(--accent-hover); transform: translateY(-0.5px); box-shadow: 0 4px 16px var(--accent-glow); }
 .btn-new-project:active { transform: scale(0.98); }
 
+.btn-ai-outline {
+    display: block; width: calc(100% - 28px); padding: 8px;
+    background: transparent; color: var(--accent2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit; letter-spacing: -0.01em;
+    margin: 0 14px 10px;
+}
+.btn-ai-outline:hover { background: var(--bg-hover); border-color: var(--accent2); transform: translateY(-0.5px); }
+
 /* Story Tree */
 .tree-section {
     flex: 1; overflow-y: auto; padding: 6px 0;
@@ -1984,6 +1995,7 @@ body::before {
     .ch-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-end; }
 
     .btn-new-project { padding: 8px; font-size: 12px; margin: 8px 10px; width: calc(100% - 20px); }
+    .btn-ai-outline { padding: 7px; font-size: 12px; margin: 0 10px 8px; width: calc(100% - 20px); }
 
     .tree-node { padding: 6px 10px; font-size: 12.5px; margin: 1px 4px; }
     .tree-section-header { padding: 8px 10px 4px; font-size: 11px; }
