@@ -135,7 +135,9 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
 GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-LICENSE_SECRET = os.environ.get('LICENSE_SECRET', 'novel-studio-secret-key-2026')
+LICENSE_SECRET = os.environ.get('LICENSE_SECRET')
+if not LICENSE_SECRET:
+    raise RuntimeError('[Novel Studio] 启动失败：LICENSE_SECRET 环境变量未设置。请在 .env 或云平台环境变量中配置。')
 
 def validate_project_id(project_id):
     """防止路径遍历攻击：确保 project_id 不包含危险字符且路径不越界"""
@@ -145,6 +147,17 @@ def validate_project_id(project_id):
     if not str(project_path).startswith(str(PROJECTS_DIR.resolve())):
         return None
     return project_id
+
+# 列名白名单验证器，防止 SQL 注入
+_SQL_COLUMN_PATTERN = __import__('re').compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+def validate_sql_column(name, allowed=None):
+    """确保列名只包含安全字符，可选白名单校验。"""
+    if not _SQL_COLUMN_PATTERN.match(name):
+        return False
+    if allowed is not None and name not in allowed:
+        return False
+    return True
 
 @app.before_request
 def _validate_project_id():
@@ -196,7 +209,7 @@ RATE_LIMIT_MAX = 30     # 每窗口最多请求数（AI 端点）
 RATE_LIMIT_GENERAL = 60 # 普通端点
 
 def check_rate_limit(user_id, endpoint='general'):
-    """简单滑动窗口限流，防止 API 滥用"""
+    """简单滑动窗口限流，防止 API 滥用。每 100 次调用自动清理过期条目。"""
     max_req = RATE_LIMIT_MAX if endpoint.startswith('ai') or 'ai/' in endpoint else RATE_LIMIT_GENERAL
     now = time.time()
     with _rate_lock:
@@ -207,7 +220,15 @@ def check_rate_limit(user_id, endpoint='general'):
             return False
         window.append((now, endpoint))
         _rate_limits[user_id] = window
+
+        # 每 100 次调用清理一次过期用户条目
+        check_rate_limit.counter = getattr(check_rate_limit, 'counter', 0) + 1
+        if check_rate_limit.counter % 100 == 0:
+            expired_users = [uid for uid, entries in _rate_limits.items() if not entries]
+            for uid in expired_users:
+                del _rate_limits[uid]
         return True
+check_rate_limit.counter = 0
 
 def init_project_db(project_id):
     """初始化项目数据库"""
@@ -3317,10 +3338,11 @@ def call_gemini(messages, temperature=0.7, max_tokens=2000):
     if system_instruction:
         payload['systemInstruction'] = {'parts': [{'text': system_instruction}]}
 
-    url = f'{GEMINI_API_URL}?key={api_key}'
+    url = GEMINI_API_URL
     data = json_mod.dumps(payload).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers={
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-goog-api-key': api_key,
     })
     try:
         with urllib.request.urlopen(req, context=_get_ssl_context(), timeout=90) as resp:
@@ -5310,19 +5332,28 @@ init_customer_platform_tables()
 
 # ===== 管理后台认证 =====
 ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH', '')
-_ADMIN_TOKENS = set()
+_ADMIN_TOKENS = {}  # {token: expires_at_timestamp}
+_ADMIN_TOKEN_TTL = 86400  # 24 小时过期
 
 if not ADMIN_PASSWORD_HASH:
-    ADMIN_PASSWORD_HASH = hashlib.sha256('novel2026'.encode()).hexdigest()
+    raise RuntimeError('[Novel Studio] 启动失败：ADMIN_PASSWORD_HASH 环境变量未设置。请运行: python3 -c "import hashlib; print(hashlib.sha256(input(\"新密码: \").encode()).hexdigest())" 并将结果配置为环境变量。')
 
 def verify_admin_password(password):
     return hashlib.sha256(password.encode()).hexdigest() == ADMIN_PASSWORD_HASH
 
+def _cleanup_expired_tokens():
+    """移除过期的 admin token"""
+    now = time.time()
+    expired = [t for t, exp in _ADMIN_TOKENS.items() if now > exp]
+    for t in expired:
+        del _ADMIN_TOKENS[t]
+
 def admin_required(f):
-    """装饰器：验证管理后台 token"""
+    """装饰器：验证管理后台 token，24 小时过期"""
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         token = request.headers.get('X-Admin-Token', '')
+        _cleanup_expired_tokens()
         if not token or token not in _ADMIN_TOKENS:
             return jsonify({'error': '未授权访问，请先登录'}), 401
         return f(*args, **kwargs)
@@ -5770,8 +5801,8 @@ def admin_verify():
     data = request.json
     if verify_admin_password(data.get('password', '')):
         token = 'admin-' + secrets.token_hex(32)
-        _ADMIN_TOKENS.add(token)
-        return jsonify({'token': token})
+        _ADMIN_TOKENS[token] = time.time() + _ADMIN_TOKEN_TTL
+        return jsonify({'token': token, 'expires_in': _ADMIN_TOKEN_TTL})
     return jsonify({'error': '密码错误'}), 403
 
 @app.route('/api/admin/licenses', methods=['GET'])
@@ -6239,10 +6270,11 @@ def index():
 
     supabase_config_script = ''
     if is_supabase_configured():
+        import json as _json
         supabase_config_script = (
             '<script>'
-            'window.__SUPABASE_URL__ = "' + get_supabase_url() + '";'
-            'window.__SUPABASE_ANON_KEY__ = "' + get_anon_key() + '";'
+            'window.__SUPABASE_URL__ = ' + _json.dumps(get_supabase_url()) + ';'
+            'window.__SUPABASE_ANON_KEY__ = ' + _json.dumps(get_anon_key()) + ';'
             '</script>'
         )
 
