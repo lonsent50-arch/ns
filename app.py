@@ -481,6 +481,14 @@ def init_project_db(project_id):
     ''')
     c.execute('CREATE INDEX IF NOT EXISTS idx_worldbuilding_cat ON worldbuilding(category)')
 
+    # 性能优化：常用查询索引
+    c.execute('CREATE INDEX IF NOT EXISTS idx_chapters_sort ON chapters(sort_order)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_outline_parent ON outline(parent_id, sort_order)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_outline_level ON outline(level, sort_order)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_ai_conv_created ON ai_conversations(created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_plot_threads_ch ON plot_threads(chapter_id_from)')
+
     # RLS 占位：为后续多租户隔离预留 user_id 列
     try:
         c.execute('ALTER TABLE project_info ADD COLUMN user_id TEXT')
@@ -1688,6 +1696,90 @@ def _extract_outline_keywords(project_id):
             if 2 <= len(w) <= 12 and w not in ('本章', '章节', '情节', '故事', '一个', '这个', '那个'):
                 keywords.add(w)
     return list(keywords)
+
+
+def _build_chapter_plan(project_id, chapter_id):
+    """构建本章的写作规划：大纲节点 + 情节节奏建议"""
+    if not chapter_id:
+        return ''
+
+    repo = get_repo()
+    plan_parts = []
+
+    if repo:
+        ch = repo.get_chapter(chapter_id)
+        ch_title = ch.get('title', '') if ch else ''
+        outline_nodes = repo.list_outline(project_id)
+
+        # 找到对应的章节大纲节点
+        chapter_outline = [n for n in outline_nodes if n.get('level') == 1
+                          and n.get('title') and (
+                              ch_title in n.get('title', '')
+                              or n.get('title', '') in ch_title
+                          )]
+
+        if chapter_outline:
+            co = chapter_outline[0]
+            plan_parts.append(f'【本章节创作规划】本章标题：{co.get("title", ch_title)}')
+
+            # 找到子节点（情节节点）
+            sub_nodes = [n for n in outline_nodes
+                        if n.get('parent_id') == co.get('id') and n.get('level', 0) >= 2]
+            if sub_nodes:
+                plan_parts.append(f'本章需要覆盖以下 {len(sub_nodes)} 个情节节点：')
+                for i, sn in enumerate(sub_nodes):
+                    node_text = sn.get('title', '')
+                    if sn.get('content'):
+                        node_text += f'（{sn["content"][:150]}）'
+                    plan_parts.append(f'  {i+1}. {node_text}')
+                plan_parts.append(f'请按上述节点顺序组织本章结构，每个节点写到位后自然过渡到下一个。')
+            elif co.get('content'):
+                plan_parts.append(f'本章创作提示：{co["content"][:300]}')
+
+        # 前章信息
+        chapters = repo.list_chapters(project_id)
+        ch_sorted = sorted([c for c in chapters if c.get('sort_order')], key=lambda c: c.get('sort_order', 0))
+        current_sort = next((c.get('sort_order', 0) for c in ch_sorted if c.get('id') == chapter_id), 0)
+        if current_sort > 1:
+            prev_ch = next((c for c in ch_sorted if c.get('sort_order') == current_sort - 1), None)
+            if prev_ch:
+                summary_data = repo.get_chapter_summary(prev_ch['id'])
+                prev_summary = (summary_data.get('summary', '') if summary_data else '') or (prev_ch.get('content', '') or '')[:200]
+                plan_parts.append(f'\n【衔接提示】前一章「{prev_ch.get("title", "")}」概要：{prev_summary[:200]}')
+
+        return '\n'.join(plan_parts) if plan_parts else ''
+
+    # SQLite fallback
+    conn = get_db(project_id)
+    ch = conn.execute('SELECT title, content FROM chapters WHERE id = ?', (chapter_id,)).fetchone()
+    ch_title = ch['title'] if ch else ''
+    outline = conn.execute(
+        'SELECT * FROM outline WHERE level >= 1 ORDER BY sort_order'
+    ).fetchall()
+
+    chapter_nodes = [n for n in outline if n['level'] == 1
+                    and n['title'] and (
+                        ch_title in n['title'] or n['title'] in ch_title
+                    )]
+
+    if chapter_nodes:
+        co = chapter_nodes[0]
+        plan_parts.append(f'【本章节创作规划】本章标题：{co["title"]}')
+        sub_nodes = [n for n in outline
+                    if n['parent_id'] == co['id'] and n['level'] >= 2]
+        if sub_nodes:
+            plan_parts.append(f'本章需要覆盖以下 {len(sub_nodes)} 个情节节点：')
+            for i, sn in enumerate(sub_nodes):
+                node_text = sn['title']
+                if sn.get('content'):
+                    node_text += f'（{sn["content"][:150]}）'
+                plan_parts.append(f'  {i+1}. {node_text}')
+            plan_parts.append('请按上述节点顺序组织本章结构。')
+        elif co.get('content'):
+            plan_parts.append(f'本章创作提示：{co["content"][:300]}')
+
+    conn.close()
+    return '\n'.join(plan_parts) if plan_parts else ''
 
 
 def _quick_quality_scan(content, project_id, chapter_id=None):
@@ -3554,6 +3646,66 @@ def ai_continue_writing(project_id):
 
     return ai_result(result, data.get('model'))
 
+
+@app.route('/api/projects/<project_id>/ai/write-chapter', methods=['POST'])
+def ai_write_chapter(project_id):
+    """AI 写本章——根据大纲规划自动生成完整章节，非碎片续写。
+    AI 根据章节大纲节点自行判断章节边界，写完自动停止。"""
+    data = request.json
+    content = data.get('content', '')  # 已有内容（可为空）
+    chapter_id = data.get('chapter_id', '')
+    target_words = data.get('target_words', 3000)  # 默认目标 3000 字
+
+    # 构建完整上下文
+    condensed = build_condensed_context(project_id, chapter_id)
+    recent_content = content[-1500:] if len(content) > 1500 else content
+
+    # 章节规划块
+    chapter_plan = _build_chapter_plan(project_id, chapter_id)
+
+    context_block = ''
+    if condensed:
+        context_block = (
+            f'【必须遵守的创作蓝图——以下信息决定了本章的全部走向】\n{condensed}\n\n'
+            f'{chapter_plan}\n\n'
+        )
+
+    if recent_content:
+        context_block += f'【本章已有开头内容，请从此处接着写】\n{recent_content}\n\n'
+
+    messages = [
+        {'role': 'system', 'content': SURVIVAL_REALISM_HARDENING + '\n' + BAIMIAO_HARDENING + '\n' +
+            '你是一位专业的小说作家。你的任务是写完本章的全部正文内容，而不是零碎地续写一小段。\n\n'
+            '【核心原则：你是章节规划者+执行者】\n'
+            '1. 根据下方的【本章节创作规划】，自行判断本章需要覆盖哪些情节节点\n'
+            f'2. 目标字数约 {target_words} 字，写到一个自然的章末断点就停止\n'
+            '3. 章节必须有起承转合：开篇→发展→高潮→收尾，不能写到哪里算哪里\n'
+            '4. 如果已有开头内容，请流畅衔接，不要重复已有部分\n\n'
+            '【人物一致性铁律】\n'
+            '1. 每个角色的性格、说话方式、行为动机必须与设定严格一致\n'
+            '2. 对话体现角色独特性格和出身，不同角色语气应明显差异\n'
+            '3. 不能引入大纲中不存在的新势力/新角色/新设定\n\n'
+            '【写作质量铁律】\n'
+            '1. 不用网文套路句式（"嘴角微扬""眼中闪过"等）\n'
+            '2. 句子长短有变化，不用AI式工整排比\n'
+            '3. 用真实感官细节（触觉/听觉/嗅觉/视觉）替代抽象形容\n'
+            '4. 直接输出本章正文，不要加"第X章"标题（标题由系统自动添加），不要加"本章完"标记'},
+        {'role': 'user', 'content': f'{context_block}请写本章全部正文，目标{target_words}字左右，到自然断点处停止。'}
+    ]
+    result = call_ai(messages, model=data.get('model'), temperature=0.75, max_tokens=4000)
+
+    # Post-write quality scan
+    if isinstance(result, str) and not result.startswith(('错误', '__')):
+        quality_warnings = _quick_quality_scan(result, project_id, chapter_id)
+        actual_words = len(result.replace('\n', '').replace(' ', ''))
+        if actual_words < target_words * 0.5:
+            quality_warnings = (quality_warnings or []) + [f'本章生成字数偏少（{actual_words}字，目标{target_words}字），可点「继续写本章」补充']
+        if quality_warnings:
+            result = {'content': result, 'quality_warnings': quality_warnings, 'word_count': actual_words}
+
+    return ai_result(result, data.get('model'))
+
+
 @app.route('/api/projects/<project_id>/ai/polish', methods=['POST'])
 def ai_polish(project_id):
     """AI 润色"""
@@ -4036,6 +4188,117 @@ def import_outline(project_id):
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'count': len(created_ids), 'ids': created_ids})
+
+
+@app.route('/api/projects/<project_id>/outline/auto-sync', methods=['POST'])
+def auto_sync_outline(project_id):
+    """从大纲中自动提取角色和剧情结构，同步到角色库和剧情走势图。
+    AI 分析大纲文本，识别人物、主线、支线，自动创建角色卡和情节节点。"""
+    if not check_feature('ai_call'):
+        return jsonify({'error': '余额不足'}), 403
+
+    conn = get_db(project_id)
+    outline_nodes = conn.execute(
+        'SELECT title, content, level FROM outline ORDER BY sort_order'
+    ).fetchall()
+    conn.close()
+
+    if not outline_nodes:
+        return jsonify({'error': '请先生成大纲'}), 400
+
+    # 构建大纲文本用于分析
+    outline_text = ''
+    for n in outline_nodes:
+        prefix = '  ' * n['level']
+        outline_text += f'{prefix}- {n["title"]}\n'
+        if n.get('content'):
+            outline_text += f'{prefix}  {n["content"][:200]}\n'
+
+    messages = [
+        {'role': 'system', 'content': '''你是一位小说策划分析师。根据大纲文本，提取以下结构化信息，返回严格JSON：
+
+{
+  "characters": [
+    {"name": "角色名", "personality": "性格描述", "goal": "角色目标", "background": "背景简介", "is_core": true}
+  ],
+  "main_plot": {"name": "主线名称", "description": "主线描述", "stages": ["阶段1", "阶段2", ...]},
+  "sub_plots": [{"name": "支线名称", "description": "支线描述", "stages": ["阶段1", ...]}],
+  "volume_structure": [{"title": "卷名", "chapter_count": 5, "summary": "卷概要"}]
+}
+
+规则：
+- characters: 提取大纲中出现的所有主要角色，is_core标记为核心主角
+- main_plot: 识别核心主线情节，分阶段描述
+- sub_plots: 识别支线（感情线/成长线/复仇线等）
+- 所有描述使用中文，简洁准确
+直接输出JSON，不要加任何解释。'''},
+        {'role': 'user', 'content': f'分析以下大纲，提取角色和剧情结构：\n\n{outline_text[:5000]}'}
+    ]
+
+    result = call_ai(messages, temperature=0.4, max_tokens=3000)
+    sync_data = safe_json_extract(result)
+
+    if not sync_data:
+        return jsonify({'error': 'AI 分析大纲失败，请重试'}), 500
+
+    # 同步角色
+    created_chars = []
+    for char in sync_data.get('characters', []):
+        name = char.get('name', '').strip()
+        if not name:
+            continue
+        conn = get_db(project_id)
+        existing = conn.execute('SELECT id FROM characters WHERE name = ?', (name,)).fetchone()
+        if existing:
+            conn.close()
+            continue
+        char_id = secrets.token_hex(8)
+        now = datetime.now().isoformat()
+        conn.execute('''
+            INSERT INTO characters (id, name, gender, age, personality, appearance, background, goal, is_core, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (char_id, name, '', '', char.get('personality', ''), '',
+              char.get('background', ''), char.get('goal', ''),
+              1 if char.get('is_core') else 0, now, now))
+        conn.commit()
+        conn.close()
+        created_chars.append({'id': char_id, 'name': name})
+
+    # 同步剧情结构到项目元数据
+    main_plot = sync_data.get('main_plot', {})
+    sub_plots = sync_data.get('sub_plots', [])
+    vol_structure = sync_data.get('volume_structure', [])
+
+    conn = get_db(project_id)
+    plot_structure = {
+        'main_plot': main_plot,
+        'sub_plots': sub_plots,
+        'volume_structure': vol_structure,
+        'synced_at': datetime.now().isoformat()
+    }
+    existing_meta = conn.execute(
+        "SELECT value FROM project_info WHERE key = 'plot_structure'"
+    ).fetchone()
+    if existing_meta:
+        conn.execute(
+            "UPDATE project_info SET value = ? WHERE key = 'plot_structure'",
+            (json.dumps(plot_structure, ensure_ascii=False),)
+        )
+    else:
+        conn.execute(
+            "INSERT INTO project_info (key, value) VALUES ('plot_structure', ?)",
+            (json.dumps(plot_structure, ensure_ascii=False),)
+        )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'characters_created': len(created_chars),
+        'characters': created_chars,
+        'plot_structure': plot_structure
+    })
+
 
 # ===== AI 世界观与角色自动生成 =====
 @app.route('/api/projects/<project_id>/ai/generate-worldbuilding', methods=['POST'])

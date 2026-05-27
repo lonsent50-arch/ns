@@ -991,6 +991,8 @@ body::before {
     transition: opacity 0.15s; z-index: 100;
 }
 .ch-action-btn:hover::after { opacity: 1; }
+.ch-write-btn { color: var(--accent) !important; border: 1px solid rgba(10,132,255,0.3) !important; }
+.ch-write-btn:hover { background: rgba(10,132,255,0.12) !important; border-color: var(--accent) !important; }
 .ch-action-delete:hover { background: rgba(255,69,58,0.15); color: var(--red); }
 
 /* Fullscreen editor */
@@ -1000,6 +1002,25 @@ body::before {
 .editor-wrap.fullscreen .editor-body { padding: 48px 20%; font-size: 18px; }
 @media(max-width:1200px) { .editor-wrap.fullscreen .editor-body { padding: 40px 12%; } }
 @media(max-width:768px) { .editor-wrap.fullscreen .editor-body { padding: 32px 8%; font-size: 16px; } }
+
+/* Plot structure view */
+.ps-section { font-size: 12px; }
+.ps-label { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 4px; }
+.ps-main { margin-bottom: 12px; padding: 8px; background: rgba(10,132,255,0.05); border-radius: 8px; border-left: 3px solid var(--accent); }
+.ps-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.ps-desc { color: var(--text-secondary); font-size: 11px; margin: 4px 0; line-height: 1.5; }
+.ps-stages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ps-stage { background: var(--bg-hover); color: var(--text-secondary); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+.ps-stage.sm { font-size: 10px; }
+.ps-subs { margin-bottom: 12px; }
+.ps-sub { padding: 6px 8px; margin: 4px 0; background: rgba(255,255,255,0.02); border-radius: 6px; }
+.ps-sub-name { font-weight: 600; color: var(--text-primary); font-size: 12px; }
+.ps-sub-desc { color: var(--text-muted); font-size: 11px; }
+.ps-vols { margin-top: 8px; }
+.ps-vol { padding: 4px 0; border-bottom: 0.5px solid var(--border); }
+.ps-vol-name { font-weight: 600; color: var(--text-primary); }
+.ps-vol-ch { color: var(--text-muted); font-size: 10px; margin-left: 6px; }
+.ps-vol-summary { color: var(--text-muted); font-size: 11px; }
 
 /* ================================================================
    MODAL
@@ -1885,7 +1906,9 @@ body::before {
     margin-top: 12px;
 }
 .auth-form input[type="email"],
-.auth-form input[type="password"] {
+.auth-form input[type="password"],
+.auth-form input[type="tel"],
+.auth-form input[type="text"] {
     width: 100%;
     padding: 12px;
     background: var(--bg-input);
@@ -1895,6 +1918,14 @@ body::before {
     font-size: 14px;
     box-sizing: border-box;
 }
+.auth-tabs { display: flex; gap: 0; margin-bottom: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.auth-tab {
+    flex: 1; padding: 10px; background: transparent; color: var(--text-muted);
+    border: none; cursor: pointer; font-size: 13px; font-family: inherit;
+    transition: all var(--transition);
+}
+.auth-tab.active { background: var(--accent); color: #fff; }
+.auth-tab:hover:not(.active) { background: var(--bg-hover); color: var(--text-primary); }
 .auth-form input:focus {
     outline: none;
     border-color: var(--accent);

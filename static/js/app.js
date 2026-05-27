@@ -735,6 +735,72 @@ function updateSaveStatus(status) {
     }
 }
 
+// ===== AI 写完整本章 =====
+async function writeCurrentChapter() {
+    if (!currentProjectId || !currentChapterId) { showToast('请先打开项目和章节', 'error'); return; }
+
+    // Show loading
+    var lel = document.getElementById('ai-loading-continue');
+    var slideoutEl = document.getElementById('slideout-ai-continue');
+    if (!slideoutEl) { showToast('AI 续写面板未加载', 'error'); return; }
+    var container = document.getElementById('ai-messages-continue');
+    if (!container) return;
+
+    if (lel) lel.style.display = 'flex';
+    if (slideoutEl.classList.contains('open')) { /* already open */ }
+    else { openSlideout('ai-continue'); }
+
+    try {
+        var targetWords = 3000; // Default, can be made configurable
+        var res = await fetch('/api/projects/' + currentProjectId + '/ai/write-chapter', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: getEditorContent(),
+                chapter_id: currentChapterId,
+                target_words: targetWords,
+                model: getCurrentModel()
+            })
+        });
+        var data = await res.json();
+        if (lel) lel.style.display = 'none';
+
+        if (data.content) {
+            // Show result in slideout
+            var aiDiv = document.createElement('div');
+            aiDiv.className = 'ai-msg assistant';
+            aiDiv.innerHTML = '<div class="msg-role">✍️ AI 写本章（' + (data.word_count || 0).toLocaleString() + '字）</div><div>' +
+                escHtml(data.content).replace(/\n/g, '<br>') + '</div>';
+            container.appendChild(aiDiv);
+
+            // Quality warnings
+            if (data.quality_warnings && data.quality_warnings.length > 0) {
+                var warnDiv = document.createElement('div');
+                warnDiv.className = 'ai-msg quality-warn';
+                warnDiv.innerHTML = '<div class="msg-role">⚠️ 质量提醒</div><div>' +
+                    data.quality_warnings.map(function(w) { return '• ' + escHtml(w); }).join('<br>') + '</div>';
+                container.appendChild(warnDiv);
+            }
+
+            // Insert into editor
+            if (currentChapterId) {
+                var existing = getEditorContent();
+                var newContent = existing ? existing + '\n\n' + data.content : data.content;
+                setEditorContent(newContent);
+                if (typeof Evolution !== 'undefined') Evolution.markAiInsert(data.content);
+                onEditorInput();
+                showToast('本章已生成（' + (data.word_count || 0).toLocaleString() + '字），内容已插入编辑器', 'success');
+            }
+
+            container.scrollTop = container.scrollHeight;
+        } else if (data.error) {
+            showToast('生成失败: ' + data.error, 'error');
+        }
+    } catch (e) {
+        if (lel) lel.style.display = 'none';
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
 // ===== Fullscreen Toggle =====
 function toggleFullscreen() {
     var wrap = document.getElementById('editor-wrap');
@@ -3035,6 +3101,78 @@ async function autoGenerateWorldAndChars(premise, genre, style) {
             if (typeof loadCharacters === 'function') loadCharacters();
         }
     } catch (e) { /* silent */ }
+
+    // 从大纲自动提取角色 + 剧情结构（主线/支线/卷结构）
+    try {
+        const syncRes = await fetch('/api/projects/' + projId + '/outline/auto-sync', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model })
+        });
+        const syncData = await syncRes.json();
+        if (syncData.success) {
+            if (syncData.characters_created > 0) {
+                showToast('自动识别 ' + syncData.characters_created + ' 个角色并同步剧情结构', 'success');
+                if (typeof loadCharacters === 'function') loadCharacters();
+            }
+            // 存储剧情结构到全局并显示
+            window._plotStructure = syncData.plot_structure;
+            if (typeof renderPlotStructure === 'function') {
+                renderPlotStructure();
+                var psv = document.getElementById('plot-structure-view');
+                if (psv) psv.style.display = 'block';
+            }
+        }
+    } catch (e) { /* silent */ }
+}
+
+// ===== 剧情走势图渲染 =====
+function renderPlotStructure() {
+    var ps = window._plotStructure;
+    if (!ps) return;
+
+    var container = document.getElementById('plot-structure-view');
+    if (!container) return;
+
+    var html = '<div class="ps-section">';
+    // 主线
+    if (ps.main_plot && ps.main_plot.name) {
+        html += '<div class="ps-main"><div class="ps-label">📌 主线</div>';
+        html += '<div class="ps-title">' + escHtml(ps.main_plot.name) + '</div>';
+        html += '<div class="ps-desc">' + escHtml(ps.main_plot.description || '') + '</div>';
+        if (ps.main_plot.stages && ps.main_plot.stages.length > 0) {
+            html += '<div class="ps-stages">' + ps.main_plot.stages.map(function(s, i) {
+                return '<span class="ps-stage">' + (i + 1) + '. ' + escHtml(s) + '</span>';
+            }).join('') + '</div>';
+        }
+        html += '</div>';
+    }
+    // 支线
+    if (ps.sub_plots && ps.sub_plots.length > 0) {
+        html += '<div class="ps-subs"><div class="ps-label">🔀 支线</div>';
+        ps.sub_plots.forEach(function(sp) {
+            html += '<div class="ps-sub"><div class="ps-sub-name">' + escHtml(sp.name || '') + '</div>';
+            html += '<div class="ps-sub-desc">' + escHtml(sp.description || '') + '</div>';
+            if (sp.stages && sp.stages.length > 0) {
+                html += '<div class="ps-stages">' + sp.stages.map(function(s) {
+                    return '<span class="ps-stage sm">' + escHtml(s) + '</span>';
+                }).join('') + '</div>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    // 卷结构
+    if (ps.volume_structure && ps.volume_structure.length > 0) {
+        html += '<div class="ps-vols"><div class="ps-label">📚 卷结构</div>';
+        ps.volume_structure.forEach(function(v) {
+            html += '<div class="ps-vol"><span class="ps-vol-name">' + escHtml(v.title || '') + '</span>';
+            html += '<span class="ps-vol-ch">（约' + (v.chapter_count || 0) + '章）</span>';
+            html += '<div class="ps-vol-summary">' + escHtml(v.summary || '') + '</div></div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 // 大纲引导提示

@@ -78,6 +78,23 @@ var SupabaseAuth = (function() {
         return result.data;
     }
 
+    // ---- 手机号注册/登录 ----
+    async function signInPhone(phone) {
+        if (!_client) throw new Error('Supabase 未配置');
+        var result = await _client.auth.signInWithOtp({ phone: phone });
+        if (result.error) throw new Error(result.error.message);
+        return result.data;
+    }
+
+    async function verifyPhoneOtp(phone, token) {
+        if (!_client) throw new Error('Supabase 未配置');
+        var result = await _client.auth.verifyOtp({ phone: phone, token: token, type: 'sms' });
+        if (result.error) throw new Error(result.error.message);
+        _session = result.data.session;
+        updateUI();
+        return result.data;
+    }
+
     // ---- 登出 ----
     async function signOut() {
         if (!_client) return;
@@ -129,7 +146,11 @@ var SupabaseAuth = (function() {
             '<h3>登录 / 注册 Novel Studio</h3>' +
             '<button class="modal-close" onclick="SupabaseAuth.hideModal()">✕</button>' +
             '</div>' +
-            '<div class="auth-form">' +
+            '<div class="auth-tabs">' +
+            '<button class="auth-tab active" onclick="SupabaseAuth._switchAuthTab(\'email\')">📧 邮箱</button>' +
+            '<button class="auth-tab" onclick="SupabaseAuth._switchAuthTab(\'phone\')">📱 手机号</button>' +
+            '</div>' +
+            '<div class="auth-form" id="auth-form-email">' +
             '<label>邮箱</label>' +
             '<input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email">' +
             '<label>密码</label>' +
@@ -138,6 +159,20 @@ var SupabaseAuth = (function() {
             '<div style="display:flex;gap:8px;margin-top:12px;">' +
             '<button id="auth-btn-login" class="btn-auth-submit">登录</button>' +
             '<button id="auth-btn-signup" class="btn-auth-submit secondary">注册</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="auth-form" id="auth-form-phone" style="display:none;">' +
+            '<label>手机号</label>' +
+            '<input type="tel" id="auth-phone" placeholder="+8613800138000" autocomplete="tel">' +
+            '<div id="auth-otp-section" style="display:none;margin-top:8px;">' +
+            '<label>验证码</label>' +
+            '<input type="text" id="auth-otp" placeholder="6位验证码" maxlength="6" style="width:120px;">' +
+            '</div>' +
+            '<div id="auth-phone-error" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>' +
+            '<div style="display:flex;gap:8px;margin-top:12px;">' +
+            '<button id="auth-btn-send-otp" class="btn-auth-submit">发送验证码</button>' +
+            '<button id="auth-btn-verify-otp" class="btn-auth-submit secondary" style="display:none;">验证登录</button>' +
+            '</div>' +
             '</div>' +
             '<p style="font-size:11px;color:var(--text-muted);margin-top:12px;text-align:center;">' +
             '首次使用将自动创建账号。数据完全隔离，确保隐私安全。</p>' +
@@ -188,6 +223,54 @@ var SupabaseAuth = (function() {
             }
         };
 
+        // Phone OTP flow
+        var phoneEl = document.getElementById('auth-phone');
+        var otpSection = document.getElementById('auth-otp-section');
+        var otpEl = document.getElementById('auth-otp');
+        var sendBtn = document.getElementById('auth-btn-send-otp');
+        var verifyBtn = document.getElementById('auth-btn-verify-otp');
+        var phoneErr = document.getElementById('auth-phone-error');
+
+        function showPhoneErr(msg) {
+            phoneErr.textContent = msg;
+            phoneErr.style.display = 'block';
+        }
+        function clearPhoneErr() {
+            phoneErr.style.display = 'none';
+        }
+
+        sendBtn.onclick = async function() {
+            clearPhoneErr();
+            var phone = phoneEl.value.trim();
+            if (!phone) { showPhoneErr('请输入手机号（含国家代码，如+86）'); return; }
+            try {
+                await signInPhone(phone);
+                otpSection.style.display = 'block';
+                sendBtn.style.display = 'none';
+                verifyBtn.style.display = 'inline-flex';
+                showPhoneErr('');
+                phoneErr.style.color = '#10b981';
+                phoneErr.style.display = 'block';
+                phoneErr.textContent = '验证码已发送，请查收短信';
+            } catch(e) {
+                showPhoneErr('发送失败：' + e.message);
+            }
+        };
+
+        verifyBtn.onclick = async function() {
+            clearPhoneErr();
+            phoneErr.style.color = '#ef4444';
+            var phone = phoneEl.value.trim();
+            var otp = otpEl.value.trim();
+            if (!otp || otp.length < 4) { showPhoneErr('请输入验证码'); return; }
+            try {
+                await verifyPhoneOtp(phone, otp);
+                hideModal();
+            } catch(e) {
+                showPhoneErr('验证失败：' + e.message);
+            }
+        };
+
         // Enter 键触发登录
         passEl.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') document.getElementById('auth-btn-login').click();
@@ -197,6 +280,22 @@ var SupabaseAuth = (function() {
     function hideModal() {
         var modal = document.getElementById('auth-modal');
         if (modal) modal.remove();
+    }
+
+    function _switchAuthTab(tab) {
+        var emailForm = document.getElementById('auth-form-email');
+        var phoneForm = document.getElementById('auth-form-phone');
+        var tabs = document.querySelectorAll('.auth-tab');
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        if (tab === 'email') {
+            emailForm.style.display = 'block';
+            phoneForm.style.display = 'none';
+            tabs[0].classList.add('active');
+        } else {
+            emailForm.style.display = 'none';
+            phoneForm.style.display = 'block';
+            tabs[1].classList.add('active');
+        }
     }
 
     // ---- 自动 Bearer Token 注入 ----
@@ -266,10 +365,13 @@ var SupabaseAuth = (function() {
         getAccessToken: getAccessToken,
         signUp: signUp,
         signIn: signIn,
+        signInPhone: signInPhone,
+        verifyPhoneOtp: verifyPhoneOtp,
         signOut: signOut,
         showModal: showModal,
         hideModal: hideModal,
         updateUI: updateUI,
+        _switchAuthTab: _switchAuthTab,
         listBooks: listBooks,
         createBook: createBook
     };

@@ -117,8 +117,9 @@
                 <span class="ch-save-status" id="ch-save-status" title="保存状态">💾 已保存</span>
                 <span id="editor-wordcount">0 字</span>
                 <div class="ch-actions">
+                    <button class="ch-action-btn ch-write-btn" onclick="writeCurrentChapter()" title="AI 写完整本章——根据大纲自动规划章节内容" aria-label="写本章">✍️</button>
                     <button class="ch-action-btn" onclick="toggleFullscreen()" title="全屏写作 (F11)" aria-label="全屏">⛶</button>
-                    <button class="ch-action-btn" onclick="triggerAiContinue()" title="AI 续写 (Ctrl+Enter)" aria-label="AI续写">🤖</button>
+                    <button class="ch-action-btn" onclick="triggerAiContinue()" title="AI 续写一小段" aria-label="AI续写">🤖</button>
                     <button class="ch-action-btn" onclick="openSlideout('ai-polish')" title="AI 润色" aria-label="润色">✨</button>
                     <button class="ch-action-btn" onclick="generateHealthReport()" title="健康度报告" aria-label="健康度" style="color:var(--accent);">🩺</button>
                     <button class="ch-action-btn ch-action-delete" onclick="deleteCurrentChapter()" title="删除本章" aria-label="删除章节">🗑</button>
@@ -682,6 +683,8 @@
             <button class="btn btn-primary btn-sm" id="outline-import-btn" onclick="importOutlineFromAI()" style="width:100%;margin-top:4px;justify-content:center;display:none;">导入大纲</button>
             <button class="btn btn-secondary btn-sm" id="outline-to-chapters-btn" onclick="generateChaptersFromOutline(false)" style="width:100%;margin-top:6px;justify-content:center;">📝 转为章节正文</button>
         </div>
+        <!-- 剧情走势图 -->
+        <div id="plot-structure-view" style="border-top:1px solid var(--border);padding:12px;max-height:360px;overflow-y:auto;display:none;"></div>
     </div>
 </div>
 
