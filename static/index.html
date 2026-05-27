@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Novel Studio">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/static/css/style.css?v=14">
+    <link rel="stylesheet" href="/static/css/style.css?v=15">
     <script>(function(){var u=navigator.userAgent;window._isCapacitor=!!(window.Capacitor||u.includes('Capacitor'));window._isIOS=/iPhone|iPad|iPod/.test(u);window._isAndroid=/Android/.test(u);document.documentElement.classList.add(window._isCapacitor?'native-app':'browser');})();</script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <!-- ═══ 部署配置：前端自动解耦 API 地址 ═══ -->
@@ -200,7 +200,7 @@
     <div class="slideout-body">
         <!-- POV Violation Alert -->
         <div class="metric-card" id="pov-alert-card">
-            <div class="metric-header">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">🚨</span>
                 <span class="m-title">有限视角硬核巡逻</span>
                 <span class="m-status" id="pov-alert-status" style="background:rgba(48,209,88,0.12);color:var(--green);">安全</span>
@@ -220,8 +220,8 @@
         </div>
 
         <!-- Rhythm Chart -->
-        <div class="metric-card" id="realism-card">
-            <div class="metric-header">
+        <div class="metric-card collapsed" id="realism-card">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">🧭</span>
                 <span class="m-title">生存逻辑与写实度雷达</span>
                 <span class="m-status" id="realism-status">检测中...</span>
@@ -251,8 +251,8 @@
         </div>
 
         <!-- Cliffhanger & Hook Analyzer -->
-        <div class="metric-card" id="hook-card">
-            <div class="metric-header">
+        <div class="metric-card collapsed" id="hook-card">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">🪝</span>
                 <span class="m-title">断章钩子密度分析器</span>
                 <span class="m-status" id="hook-status">检测中...</span>
@@ -273,8 +273,8 @@
         </div>
 
         <!-- Plot Deviation Monitor -->
-        <div class="metric-card" id="deviation-card">
-            <div class="metric-header">
+        <div class="metric-card collapsed" id="deviation-card">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">🎯</span>
                 <span class="m-title">剧情偏离度监控</span>
                 <span class="m-status" id="deviation-status" style="background:rgba(48,209,88,0.12);color:var(--green);">锚定中</span>
@@ -297,8 +297,8 @@
         </div>
 
         <!-- Retention Simulator -->
-        <div class="metric-card" id="retention-card">
-            <div class="metric-header">
+        <div class="metric-card collapsed" id="retention-card">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">📊</span>
                 <span class="m-title">验证期留存预测</span>
                 <span class="m-status" id="retention-platform" style="background:rgba(245,158,11,0.12);color:var(--orange);">番茄·新书期</span>
@@ -342,7 +342,7 @@
 
         <!-- Cliche Blacklist - 高级滤镜引擎 -->
         <div class="metric-card" id="cliche-card">
-            <div class="metric-header">
+            <div class="metric-header" onclick="toggleMetricCard(this)">
                 <span class="m-icon">🚫</span>
                 <span class="m-title">去 AI 味高级滤镜</span>
                 <span class="m-status" id="cliche-status" style="background:rgba(48,209,88,0.12);color:var(--green);">干净</span>
@@ -1345,6 +1345,12 @@ function resetPovCard() {
     if (patrolEl) patrolEl.textContent = '待检测...';
 }
 
+// Dashboard metric card toggle
+function toggleMetricCard(header) {
+    var card = header.parentElement;
+    card.classList.toggle('collapsed');
+}
+
 function escAttr(s) {
     return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -1430,6 +1436,15 @@ function acceptInject() {
 
 function dismissInject() {
     document.getElementById('ai-inject-bar').classList.remove('show');
+}
+
+// Paste sanitization — strip rich HTML, keep plain text only
+if (editorEl) {
+    editorEl.addEventListener('paste', function(e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertText', false, text);
+    });
 }
 
 // Editor helpers (sync contenteditable with hidden textarea)

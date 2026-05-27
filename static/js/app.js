@@ -543,7 +543,7 @@ function renderStoryTree() {
         html += '<div class="tree-node'+active+'" onclick="selectChapter(\''+ch.id+'\')" draggable="true" ondragstart="onChapterDragStart(event,\''+ch.id+'\','+i+')" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onChapterDrop(event,'+i+')">';
         html += '<span class="tree-phase '+phaseCls+'">'+phase+'</span>';
         html += '<span class="tree-index">'+(i+1)+'.</span>';
-        html += '<div class="tree-title-wrap"><span class="tree-title">'+escHtml(ch.title)+'</span>'+aiTag+'</div>';
+        html += '<div class="tree-title-wrap"><span class="tree-title" title="'+escHtml(ch.title)+'">'+escHtml(ch.title)+'</span>'+aiTag+'</div>';
         html += '<span class="tree-wc">'+(ch.word_count||0)+'字</span>';
         html += '<button class="tree-del" onclick="event.stopPropagation();deleteChapterById(\''+ch.id+'\')" title="删除">×</button>';
         html += '</div>';
