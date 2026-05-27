@@ -57,6 +57,15 @@ body {
     letter-spacing: -0.01em;
 }
 
+.skip-link {
+    position: absolute; top: -100%; left: 16px;
+    padding: 8px 16px; background: var(--accent); color: #fff;
+    border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+    z-index: 10000; text-decoration: none;
+    transition: top 0.2s;
+}
+.skip-link:focus { top: 16px; }
+
 body::before {
     content: ''; position: fixed; inset: 0;
     background:

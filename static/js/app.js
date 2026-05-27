@@ -393,37 +393,39 @@ async function loadProjects() {
 }
 
 async function deleteProject(pid, name) {
-    if (!confirm('确定要删除项目「'+name+'」吗？\n\n此操作不可撤销，所有章节、大纲、角色数据将被永久删除。')) return;
-    const res = await apiDelete('/api/projects/'+pid);
-    if (res && res.success) {
-        // 清除 IndexedDB 中该项目的所有草稿
-        if (typeof NovelDB !== 'undefined') {
-            NovelDB.clearProjectDrafts(pid);
+    showConfirm('确定要删除项目「'+name+'」吗？\n\n此操作不可撤销，所有章节、大纲、角色数据将被永久删除。', async function(ok) {
+        if (!ok) return;
+        const res = await apiDelete('/api/projects/'+pid);
+        if (res && res.success) {
+            // 清除 IndexedDB 中该项目的所有草稿
+            if (typeof NovelDB !== 'undefined') {
+                NovelDB.clearProjectDrafts(pid);
+            }
+            if (currentProjectId === pid) {
+                currentProjectId = null;
+                currentChapterId = null;
+                chapters = [];
+                // Reset to welcome state
+                var welcome = document.getElementById('welcome-overlay');
+                var editorWrap = document.getElementById('editor-wrap');
+                var lore = document.getElementById('lore-monitor');
+                if (welcome) welcome.style.display = 'flex';
+                if (editorWrap) editorWrap.style.display = 'none';
+                if (lore) lore.style.display = 'none';
+                // Reset brand header
+                var brandText = document.querySelector('.brand-text');
+                if (brandText) brandText.textContent = 'Novel Studio';
+                var brandSub = document.querySelector('.brand-sub');
+                if (brandSub) brandSub.textContent = '工业级 · AI网文工作台';
+                // Reset editor
+                var et = document.getElementById('editor-title'); if (et) et.value = '';
+                setEditorContent('');
+                renderStoryTree();
+            }
+            showToast('项目已删除', 'success');
+            await loadProjects();
         }
-        if (currentProjectId === pid) {
-            currentProjectId = null;
-            currentChapterId = null;
-            chapters = [];
-            // Reset to welcome state
-            var welcome = document.getElementById('welcome-overlay');
-            var editorWrap = document.getElementById('editor-wrap');
-            var lore = document.getElementById('lore-monitor');
-            if (welcome) welcome.style.display = 'flex';
-            if (editorWrap) editorWrap.style.display = 'none';
-            if (lore) lore.style.display = 'none';
-            // Reset brand header
-            var brandText = document.querySelector('.brand-text');
-            if (brandText) brandText.textContent = 'Novel Studio';
-            var brandSub = document.querySelector('.brand-sub');
-            if (brandSub) brandSub.textContent = '工业级 · AI网文工作台';
-            // Reset editor
-            var et = document.getElementById('editor-title'); if (et) et.value = '';
-            setEditorContent('');
-            renderStoryTree();
-        }
-        showToast('项目已删除', 'success');
-        await loadProjects();
-    }
+    });
 }
 
 async function createProject() {
@@ -626,15 +628,17 @@ function selectFirstChapter() {
 
 async function deleteCurrentChapter() {
     if (!currentChapterId) return;
-    if (!confirm('确定要删除当前章节吗?')) return;
-    const res = await apiDelete('/api/projects/'+currentProjectId+'/chapters/'+currentChapterId);
-    if (res && res.success) {
-        currentChapterId=null;
-        var titleEl = document.getElementById('editor-title');
-        if (titleEl) titleEl.value = '';
-        setEditorContent('');
-        await loadChapters();
-    }
+    showConfirm('确定要删除当前章节吗?', async function(ok) {
+        if (!ok) return;
+        const res = await apiDelete('/api/projects/'+currentProjectId+'/chapters/'+currentChapterId);
+        if (res && res.success) {
+            currentChapterId=null;
+            var titleEl = document.getElementById('editor-title');
+            if (titleEl) titleEl.value = '';
+            setEditorContent('');
+            await loadChapters();
+        }
+    });
 }
 
 async function saveCurrentChapter() {
@@ -1793,9 +1797,11 @@ function newCharacter() {
 }
 
 async function deleteCharacter(cid) {
-    if (!confirm('确定要删除这个角色吗?')) return;
-    const res = await apiDelete('/api/projects/'+currentProjectId+'/characters/'+cid);
-    if (res && res.success) { await loadCharacters(); showToast('角色已删除','info'); }
+    showConfirm('确定要删除这个角色吗?', async function(ok) {
+        if (!ok) return;
+        const res = await apiDelete('/api/projects/'+currentProjectId+'/characters/'+cid);
+        if (res && res.success) { await loadCharacters(); showToast('角色已删除','info'); }
+    });
 }
 
 // ── 角色知识账本 Tab ──
@@ -3066,6 +3072,28 @@ async function saveGoal() {
     if (res && res.id) { closeModal(); await loadStats(); showToast('目标已设定','success'); }
 }
 
+// ===== 自定义确认对话框 =====
+window._confirmResolve = null;
+function showConfirm(message, onOk) {
+    var modal = document.getElementById('confirm-modal');
+    var title = document.getElementById('confirm-title');
+    var okBtn = document.getElementById('confirm-ok-btn');
+    var cancelBtn = document.getElementById('confirm-cancel-btn');
+    title.textContent = message;
+    modal.style.display = 'flex';
+    okBtn.focus();
+    window._confirmResolve = onOk;
+    var cleanup = function() {
+        modal.style.display = 'none';
+        okBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+    };
+    var onConfirm = function() { cleanup(); if (window._confirmResolve) window._confirmResolve(true); };
+    var onCancel = function() { cleanup(); if (window._confirmResolve) window._confirmResolve(false); };
+    okBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+}
+
 // ===== Modal/Export =====
 function openModal(mid) { document.getElementById(mid).style.display='flex'; }
 function closeModal() {
@@ -3614,25 +3642,27 @@ function sendQuickSupport(question) {
 // ===== Feature: 章节列表中删除按钮 =====
 async function deleteChapterById(cid) {
     if (!currentProjectId) return;
-    if (!confirm('确定要删除此章节吗？此操作不可撤销。')) return;
-    const wasCurrent = currentChapterId === cid;
-    const res = await apiDelete('/api/projects/' + currentProjectId + '/chapters/' + cid);
-    if (res && res.success) {
-        if (wasCurrent) {
-            currentChapterId = null;
-            var titleEl = document.getElementById('editor-title');
-            if (titleEl) titleEl.value = '';
-            setEditorContent('');
-            var statusCh = document.getElementById('status-chapter');
-            if (statusCh) statusCh.textContent = '';
+    showConfirm('确定要删除此章节吗？此操作不可撤销。', async function(ok) {
+        if (!ok) return;
+        const wasCurrent = currentChapterId === cid;
+        const res = await apiDelete('/api/projects/' + currentProjectId + '/chapters/' + cid);
+        if (res && res.success) {
+            if (wasCurrent) {
+                currentChapterId = null;
+                var titleEl = document.getElementById('editor-title');
+                if (titleEl) titleEl.value = '';
+                setEditorContent('');
+                var statusCh = document.getElementById('status-chapter');
+                if (statusCh) statusCh.textContent = '';
+            }
+            // 清除 IndexedDB 中对应草稿
+            if (typeof NovelDB !== 'undefined') {
+                NovelDB.clearDraft(currentProjectId, cid);
+            }
+            await loadChapters();
+            showToast('章节已删除', 'info');
         }
-        // 清除 IndexedDB 中对应草稿
-        if (typeof NovelDB !== 'undefined') {
-            NovelDB.clearDraft(currentProjectId, cid);
-        }
-        await loadChapters();
-        showToast('章节已删除', 'info');
-    }
+    });
 }
 
 // ===== Feature: 创作流程进度追踪 =====
@@ -4094,22 +4124,24 @@ async function previewVersion(sid, el) {
 
 async function revertToVersion() {
     if (!_selectedVersionId) return;
-    if (!confirm('确定回退到此版本吗？当前内容将自动保存为一个新快照。')) return;
-    try {
-        const res = await apiPost('/api/projects/'+currentProjectId+'/chapters/'+currentChapterId+'/snapshots/'+_selectedVersionId+'/revert');
-        if (res && res.success) {
-            closeModal();
-            // 重载章节内容
-            const ch = chapters.find(c => c.id === currentChapterId);
-            if (ch) {
-                await selectChapter(currentChapterId);
-                await loadChapters();
+    showConfirm('确定回退到此版本吗？当前内容将自动保存为一个新快照。', async function(ok) {
+        if (!ok) return;
+        try {
+            const res = await apiPost('/api/projects/'+currentProjectId+'/chapters/'+currentChapterId+'/snapshots/'+_selectedVersionId+'/revert');
+            if (res && res.success) {
+                closeModal();
+                // 重载章节内容
+                const ch = chapters.find(c => c.id === currentChapterId);
+                if (ch) {
+                    await selectChapter(currentChapterId);
+                    await loadChapters();
+                }
+                showToast('已回退到 v' + res.version, 'success');
             }
-            showToast('已回退到 v' + res.version, 'success');
+        } catch(e) {
+            showToast('回退失败: '+e.message, 'error');
         }
-    } catch(e) {
-        showToast('回退失败: '+e.message, 'error');
-    }
+    });
 }
 
 // Keyboard shortcuts for reader
@@ -4253,15 +4285,17 @@ async function saveWorldItem() {
 async function deleteWorldItem() {
     const id = document.getElementById('wb-edit-id').value;
     if (!id || !currentProjectId) return;
-    if (!confirm('确定删除此世界观条目吗？')) return;
-    try {
-        const res = await apiDelete('/api/projects/' + currentProjectId + '/worldbuilding/' + id);
-        if (res && res.success) {
-            cancelWorldEdit();
-            await loadWorldItems();
-            showToast('已删除', 'info');
-        }
-    } catch(e) { showToast('删除失败: ' + e.message, 'error'); }
+    showConfirm('确定删除此世界观条目吗？', async function(ok) {
+        if (!ok) return;
+        try {
+            const res = await apiDelete('/api/projects/' + currentProjectId + '/worldbuilding/' + id);
+            if (res && res.success) {
+                cancelWorldEdit();
+                await loadWorldItems();
+                showToast('已删除', 'info');
+            }
+        } catch(e) { showToast('删除失败: ' + e.message, 'error'); }
+    });
 }
 
 async function generateWorldItems() {

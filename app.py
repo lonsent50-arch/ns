@@ -134,7 +134,13 @@ PROJECTS_DIR = BASE_DIR / 'projects'
 PROJECTS_DIR.mkdir(exist_ok=True)
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
-GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+
+# AI 模型版本 —— 集中管理，后续升级只需改此处
+DEEPSEEK_MODEL = 'deepseek-chat'
+CLAUDE_MODEL = 'claude-sonnet-4-20250514'
+GEMINI_MODEL = 'gemini-2.5-flash'
+GEMINI_API_URL = f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent'
+
 LICENSE_SECRET = os.environ.get('LICENSE_SECRET')
 if not LICENSE_SECRET:
     raise RuntimeError('[Novel Studio] 启动失败：LICENSE_SECRET 环境变量未设置。请在 .env 或云平台环境变量中配置。')
@@ -158,6 +164,38 @@ def validate_sql_column(name, allowed=None):
     if allowed is not None and name not in allowed:
         return False
     return True
+
+def safe_json_extract(text, default=None):
+    """从 AI 返回文本中安全提取 JSON。
+    自动处理 markdown 代码块包裹、尾部多余逗号等常见格式问题。
+    """
+    if not text or not isinstance(text, str):
+        return default
+    cleaned = text.strip()
+    # 移除 markdown 代码块标记
+    for prefix in ['```json\n', '```json', '```\n', '```']:
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            break
+    for suffix in ['\n```', '```']:
+        if cleaned.endswith(suffix):
+            cleaned = cleaned[:-len(suffix)]
+            break
+    cleaned = cleaned.strip()
+    if not cleaned:
+        return default
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # 尝试修复：去除尾部逗号（AI 常见错误）
+    import re as _re
+    cleaned = _re.sub(r',\s*}', '}', cleaned)
+    cleaned = _re.sub(r',\s*\]', ']', cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return default
 
 @app.before_request
 def _validate_project_id():
@@ -2635,10 +2673,8 @@ def api_summarize_chapter(project_id, chapter_id):
         }]
 
         result = call_ai(messages, temperature=0.3, max_tokens=2000)
-        try:
-            cleaned = result.replace('```json', '').replace('```', '').strip()
-            parsed = json.loads(cleaned)
-        except (json.JSONDecodeError, AttributeError):
+        parsed = safe_json_extract(result)
+        if parsed is None:
             return jsonify({'content': result, 'parsed': False})
 
         now = datetime.now().isoformat()
@@ -2733,10 +2769,8 @@ def api_summarize_chapter(project_id, chapter_id):
     result = call_ai(messages, temperature=0.3, max_tokens=2000)
 
     # 解析 AI 输出
-    try:
-        cleaned = result.replace('```json', '').replace('```', '').strip()
-        parsed = json.loads(cleaned)
-    except (json.JSONDecodeError, AttributeError):
+    parsed = safe_json_extract(result)
+    if parsed is None:
         return jsonify({'content': result, 'parsed': False})
 
     now = datetime.now().isoformat()
@@ -3251,7 +3285,7 @@ def call_deepseek(messages, temperature=0.7, max_tokens=2000):
     if not api_key:
         return '错误：请先在设置中配置 DeepSeek API Key', None
     payload = {
-        'model': 'deepseek-chat',
+        'model': DEEPSEEK_MODEL,
         'messages': messages,
         'temperature': temperature,
         'max_tokens': max_tokens
@@ -3287,7 +3321,7 @@ def call_claude(messages, temperature=0.7, max_tokens=2000):
             claude_messages.append({'role': m['role'], 'content': m['content']})
 
     payload = {
-        'model': 'claude-sonnet-4-20250514',
+        'model': CLAUDE_MODEL,
         'max_tokens': max_tokens,
         'temperature': temperature,
         'messages': claude_messages
@@ -3971,13 +4005,8 @@ def ai_generate_worldbuilding(project_id):
         return ai_result(result)
 
     # 解析 AI 返回的 JSON
-    items = []
-    try:
-        cleaned = result.replace('```json\n', '').replace('```\n', '').replace('```', '').strip()
-        items = json.loads(cleaned)
-        if not isinstance(items, list):
-            items = []
-    except (json.JSONDecodeError, TypeError):
+    items = safe_json_extract(result, default=[])
+    if not isinstance(items, list):
         items = []
 
     if not items:
@@ -4129,13 +4158,8 @@ def ai_generate_characters_batch(project_id):
         return ai_result(result)
 
     # 解析并批量创建
-    chars = []
-    try:
-        cleaned = result.replace('```json\n', '').replace('```\n', '').replace('```', '').strip()
-        chars = json.loads(cleaned)
-        if not isinstance(chars, list):
-            chars = []
-    except (json.JSONDecodeError, TypeError):
+    chars = safe_json_extract(result, default=[])
+    if not isinstance(chars, list):
         chars = []
 
     if not chars:

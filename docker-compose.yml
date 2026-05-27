@@ -18,3 +18,8 @@ services:
       retries: 3
       start_period: 10s
     command: gunicorn app:app --bind 0.0.0.0:${PORT:-5050} --workers 4 --timeout 120
+    volumes:
+      - novel-studio-data:/app/projects
+
+volumes:
+  novel-studio-data:

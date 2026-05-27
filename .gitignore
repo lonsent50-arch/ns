@@ -1,51 +1,14 @@
-# ── 敏感密钥文件 ──
 .env
-*.env.local
-*.env.production
-
-# ── 数据库文件 ──
-*.db
-*.sqlite
-*.db-journal
-*.db-wal
-*.db-shm
-
-# ── 用户数据目录 ──
-projects/
-
-# ── Python 缓存 ──
 __pycache__/
 *.pyc
-*.pyo
-*.egg-info/
-dist/
-build/
-
-# ── 日志 ──
+projects/
 logs/
-*.log
-
-# ── 系统文件 ──
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
-
-# ── IDE 配置 ──
-.vscode/
-.idea/
-*.code-workspace
-
-# ── 移动端（独立仓库管理）──
 mobile/
-
-# ── 推广素材 ──
 promo/
-
-# ── 本地桌面启动文件（开发用）──
-main.py
-run.sh
-setup.sh
-start.sh
-start_desktop.sh
+workbench.html
+server.log
+license.db
+*.keystore
+.DS_Store
+.claude/
+node_modules/

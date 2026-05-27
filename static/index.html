@@ -14,27 +14,19 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <!-- ═══ 部署配置：前端自动解耦 API 地址 ═══ -->
     <script>
-    (function(){
-        window.API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? ''
-            : 'https://你的后端域名.railway.app';  // ← 上线时替换为你的 Railway/Render 后端地址
-
-        var _orig = window.fetch;
-        window.fetch = function(url, opts) {
-            if (typeof url === 'string' && url.startsWith('/api/') && window.API_BASE_URL) {
-                url = window.API_BASE_URL + url;
-            }
-            return _orig.call(window, url, opts);
-        };
-    })();
+    // 前后端同域部署，API 请求直接走相对路径，无需跨域代理
     </script>
 </head>
 <body>
+
+<!-- Skip to main content -->
+<a href="#main-content" class="skip-link">跳到主内容</a>
 
 <!-- ================================================================
      THREE-COLUMN WORKBENCH LAYOUT
      ================================================================ -->
 <div class="app-container" id="app-container">
+    <span id="main-content" tabindex="-1"></span>
 
     <!-- ===== LEFT COLUMN: Story Tree + Lore Monitor ===== -->
     <div class="panel-left" id="panel-left">
@@ -119,7 +111,7 @@
                 <input type="text" class="editor-title-input" id="editor-title" placeholder="章节标题" onchange="saveCurrentChapter()">
                 <div class="ch-meta">
                     <span id="editor-wordcount">0 字</span>
-                    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentChapter()" title="删除">🗑</button>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentChapter()" title="删除" aria-label="删除章节" type="button">🗑</button>
                     <button class="btn btn-ghost btn-sm" onclick="triggerAiContinue()" title="AI续写">🤖</button>
                     <button class="btn btn-ghost btn-sm" onclick="openSlideout('ai-polish')" title="润色">✨</button>
                     <button class="btn btn-ghost btn-sm" onclick="generateHealthReport()" title="健康度报告" style="color:var(--accent);">🩺</button>
@@ -128,7 +120,7 @@
 
             <!-- Contenteditable editor (primary) -->
             <div class="editor-body-wrap">
-                <div class="editor-body" id="editor-body" contenteditable="true" oninput="onEditorInput()" data-placeholder="开始创作...
+                <div class="editor-body" id="editor-body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="章节编辑器" oninput="onEditorInput()" data-placeholder="开始创作...
 
 按 Ctrl+Enter AI续写  |  Ctrl+/ 指令面板  |  Ctrl+N 新建项目"></div>
                 <button class="editor-ai-btn" id="editor-ai-btn" onclick="triggerAiContinue()" title="AI 续写 (Ctrl+Enter)">
@@ -192,10 +184,10 @@
 <div class="slideout-overlay" id="slideout-overlay" onclick="closeSlideout()"></div>
 
 <!-- Dashboard -->
-<div class="slideout-panel" id="slideout-dashboard">
+<div class="slideout-panel" role="complementary" id="slideout-dashboard">
     <div class="slideout-header">
         <h3>📊 数字员工仪表盘</h3>
-        <button class="slideout-close" onclick="closeSlideout()">✕</button>
+        <button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button>
     </div>
     <div class="slideout-body">
         <!-- POV Violation Alert -->
@@ -360,10 +352,10 @@
 </div>
 
 <!-- AI Chat -->
-<div class="slideout-panel" id="slideout-chat">
+<div class="slideout-panel" role="complementary" id="slideout-chat">
     <div class="slideout-header">
         <h3>💬 AI 对话</h3>
-        <button class="slideout-close" onclick="closeSlideout()">✕</button>
+        <button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button>
     </div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar">
@@ -391,10 +383,10 @@
 </div>
 
 <!-- AI Continue -->
-<div class="slideout-panel" id="slideout-ai-continue">
+<div class="slideout-panel" role="complementary" id="slideout-ai-continue">
     <div class="slideout-header">
         <h3>🤖 AI 续写</h3>
-        <button class="slideout-close" onclick="closeSlideout()">✕</button>
+        <button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button>
     </div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar" id="direction-bar">
@@ -433,8 +425,8 @@
 </div>
 
 <!-- AI Polish -->
-<div class="slideout-panel" id="slideout-ai-polish">
-    <div class="slideout-header"><h3>✨ AI 润色</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-ai-polish">
+    <div class="slideout-header"><h3>✨ AI 润色</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
@@ -459,8 +451,8 @@
 </div>
 
 <!-- AI De-AI -->
-<div class="slideout-panel" id="slideout-ai-deai">
-    <div class="slideout-header"><h3>🔎 AI 味检测 & 去AI味</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-ai-deai">
+    <div class="slideout-header"><h3>🔎 AI 味检测 & 去AI味</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
@@ -486,8 +478,8 @@
 </div>
 
 <!-- AI Brainstorm -->
-<div class="slideout-panel" id="slideout-brainstorm">
-    <div class="slideout-header"><h3>🧠 头脑风暴</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-brainstorm">
+    <div class="slideout-header"><h3>🧠 头脑风暴</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
@@ -510,8 +502,8 @@
 </div>
 
 <!-- AI Guided Writing -->
-<div class="slideout-panel" id="slideout-guided">
-    <div class="slideout-header"><h3>🧭 AI 写作引导</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-guided">
+    <div class="slideout-header"><h3>🧭 AI 写作引导</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="display:flex;flex-direction:column;padding:0;">
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
@@ -534,8 +526,8 @@
 </div>
 
 <!-- AI Book Gen -->
-<div class="slideout-panel" id="slideout-book-gen">
-    <div class="slideout-header"><h3>📚 一键成书</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-book-gen">
+    <div class="slideout-header"><h3>📚 一键成书</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -566,8 +558,8 @@
 </div>
 
 <!-- AI Script -->
-<div class="slideout-panel" id="slideout-script">
-    <div class="slideout-header"><h3>🎬 转剧本</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-script">
+    <div class="slideout-header"><h3>🎬 转剧本</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -588,8 +580,8 @@
 </div>
 
 <!-- Genre Ideas -->
-<div class="slideout-panel" id="slideout-genre">
-    <div class="slideout-header"><h3>💡 灵感 & 题材</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-genre">
+    <div class="slideout-header"><h3>💡 灵感 & 题材</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -632,8 +624,8 @@
 </div>
 
 <!-- AI Review -->
-<div class="slideout-panel" id="slideout-review">
-    <div class="slideout-header"><h3>📝 内容审阅</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-review">
+    <div class="slideout-header"><h3>📝 内容审阅</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -649,8 +641,8 @@
 </div>
 
 <!-- Characters -->
-<div class="slideout-panel" id="slideout-characters">
-    <div class="slideout-header"><h3>👤 角色管理</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-characters">
+    <div class="slideout-header"><h3>👤 角色管理</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div style="padding:10px;border-bottom:1px solid var(--border);display:flex;gap:6px;"><button class="btn btn-primary btn-sm" onclick="newCharacter()">＋ 新建角色</button><button class="btn btn-secondary btn-sm" onclick="generateAllCharacters()" title="AI 批量生成角色">🤖 AI 批量生成</button></div>
         <div id="character-list" style="padding:8px;max-height:400px;overflow-y:auto;">
@@ -660,8 +652,8 @@
 </div>
 
 <!-- Outline -->
-<div class="slideout-panel" id="slideout-outline">
-    <div class="slideout-header"><h3>📋 情节大纲</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-outline">
+    <div class="slideout-header"><h3>📋 情节大纲</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div style="padding:10px;border-bottom:1px solid var(--border);"><button class="btn btn-primary btn-sm" onclick="createOutlineNode(null)">＋ 添加节点</button></div>
         <div id="outline-tree" style="padding:4px;max-height:300px;overflow-y:auto;">
@@ -687,8 +679,8 @@
 </div>
 
 <!-- Worldbuilding -->
-<div class="slideout-panel" id="slideout-worldbuilding">
-    <div class="slideout-header"><h3>🌐 世界观设定</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-worldbuilding">
+    <div class="slideout-header"><h3>🌐 世界观设定</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div style="padding:8px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;" id="wb-category-list">
             <div style="padding:6px 10px;cursor:pointer;border-radius:16px;font-size:11px;background:rgba(10,132,255,0.1);color:var(--accent);font-weight:600;" onclick="filterWorldCategory('')" data-cat="">全部</div>
@@ -715,8 +707,8 @@
 </div>
 
 <!-- Stats -->
-<div class="slideout-panel" id="slideout-stats">
-    <div class="slideout-header"><h3>📊 写作统计</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-stats">
+    <div class="slideout-header"><h3>📊 写作统计</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <div class="stats-grid" style="margin-bottom:24px;">
             <div class="stat-card"><div class="sc-value" id="stat-total-words-2">0</div><div class="sc-label">总字数</div></div>
@@ -731,8 +723,8 @@
 </div>
 
 <!-- Export -->
-<div class="slideout-panel" id="slideout-export">
-    <div class="slideout-header"><h3>📤 导出作品</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-export">
+    <div class="slideout-header"><h3>📤 导出作品</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <div style="display:flex;flex-direction:column;gap:12px;">
             <button class="export-option" onclick="exportProject('docx')"><span class="eo-icon">📘</span><div class="eo-text"><div class="eo-title">导出为 Word (.docx)</div><div class="eo-desc">保留章节结构，适合打印、编辑和分享</div></div></button>
@@ -743,8 +735,8 @@
 </div>
 
 <!-- Import -->
-<div class="slideout-panel" id="slideout-import">
-    <div class="slideout-header"><h3>📥 智能导入</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-import">
+    <div class="slideout-header"><h3>📥 智能导入</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <div style="background:var(--bg-surface2);border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;margin-bottom:20px;cursor:pointer;" onclick="var inp=document.createElement('input');inp.type='file';inp.accept='.txt,.md,.docx';inp.onchange=function(){if(inp.files[0])handleDroppedFile(inp.files[0])};inp.click();">
             <div style="font-size:48px;margin-bottom:12px;">📂</div>
@@ -762,8 +754,8 @@
 </div>
 
 <!-- VIP -->
-<div class="slideout-panel" id="slideout-vip">
-    <div class="slideout-header"><h3>💎 会员中心</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-vip">
+    <div class="slideout-header"><h3>💎 会员中心</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
             <h2 style="font-size:18px;font-weight:700;margin:0;">模型套餐</h2>
@@ -789,8 +781,8 @@
 </div>
 
 <!-- Settings -->
-<div class="slideout-panel" id="slideout-settings">
-    <div class="slideout-header"><h3>⚙️ 设置</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-settings">
+    <div class="slideout-header"><h3>⚙️ 设置</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <p style="color:var(--text-muted);margin-bottom:24px;font-size:13px;">模型由套餐自动配置，选择默认写作模型偏好</p>
         <div style="background:var(--bg-surface2);border-radius:10px;padding:20px;margin-bottom:16px;">
@@ -823,8 +815,8 @@
 </div>
 
 <!-- Projects -->
-<div class="slideout-panel" id="slideout-projects">
-    <div class="slideout-header"><h3>📁 项目管理</h3><button class="slideout-close" onclick="closeSlideout()">✕</button></div>
+<div class="slideout-panel" role="complementary" id="slideout-projects">
+    <div class="slideout-header"><h3>📁 项目管理</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body">
         <button class="btn btn-primary" onclick="openModal('new-project-modal')" style="margin-bottom:20px;">＋ 新建项目</button>
         <div id="project-grid">
@@ -864,7 +856,7 @@
      ================================================================ -->
 
 <!-- New Project Modal -->
-<div class="modal-overlay" id="new-project-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="new-project-modal" style="display:none;">
     <div class="modal modal-new-project">
         <button class="modal-close-btn" onclick="closeModal()">✕</button>
         <div class="np-header"><div class="np-icon">📖</div><div class="np-title">创建新项目</div><div class="np-subtitle">设定你的故事世界，开启创作之旅</div></div>
@@ -878,7 +870,7 @@
 </div>
 
 <!-- Character Modal -->
-<div class="modal-overlay" id="character-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="character-modal" style="display:none;">
     <div class="modal" style="min-width:560px;">
         <h2 id="char-modal-title">新建角色</h2>
         <input type="hidden" id="char-edit-id">
@@ -925,7 +917,7 @@
 </div>
 
 <!-- Goal Modal -->
-<div class="modal-overlay" id="goal-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="goal-modal" style="display:none;">
     <div class="modal"><h2>设定写作目标</h2>
         <div class="form-group"><label>目标类型</label><select id="goal-type"><option value="daily">每日字数目标</option><option value="total">总字数目标</option></select></div>
         <div class="form-group"><label>目标字数</label><input type="number" id="goal-value" placeholder="500" value="500"></div>
@@ -934,7 +926,7 @@
 </div>
 
 <!-- Purchase Modal -->
-<div class="modal-overlay" id="purchase-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="purchase-modal" style="display:none;">
     <div class="modal" style="text-align:center;min-width:420px;">
         <div id="purchase-step-pay"><h2>购买<span id="purchase-tier-name">月卡</span></h2><div style="padding:20px 0;"><div style="font-size:36px;font-weight:800;background:linear-gradient(135deg,var(--accent-hover),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;">¥<span id="purchase-amount">49.9</span></div><div style="color:var(--text-muted);font-size:12px;margin-bottom:20px;">订单号: <code style="color:var(--accent-hover);" id="purchase-order-id">-</code></div><div id="purchase-qr-area" style="display:flex;justify-content:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;"><div id="purchase-wechat-qr-wrap" style="display:none;text-align:center;"><img id="purchase-wechat-qr" src="" style="width:160px;height:160px;border:1px solid var(--border);border-radius:10px;object-fit:contain;"><div style="font-size:10px;color:var(--green);margin-top:4px;">微信支付</div></div><div id="purchase-alipay-qr-wrap" style="display:none;text-align:center;"><img id="purchase-alipay-qr" src="" style="width:160px;height:160px;border:1px solid var(--border);border-radius:10px;object-fit:contain;"><div style="font-size:10px;color:var(--accent);margin-top:4px;">支付宝</div></div></div><div id="purchase-bank-info" style="display:none;background:var(--bg-surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;text-align:left;line-height:1.8;"><div style="font-weight:600;margin-bottom:4px;color:var(--text-primary);">银行转账</div><div>开户行: <span id="purchase-bank-name" style="color:var(--text-secondary);">-</span></div><div>账号: <code id="purchase-bank-account" style="color:var(--accent-hover);">-</code></div><div>户名: <span id="purchase-bank-holder" style="color:var(--text-secondary);">-</span></div></div><div id="purchase-no-payment" style="padding:16px;color:var(--text-muted);font-size:12px;text-align:center;display:none;">请联系客服获取收款码<br><span id="purchase-contact-info" style="color:var(--accent-hover);"></span></div><div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">支付 ¥<span id="purchase-amount2">49.9</span> 后点击下方按钮</div><button class="btn btn-primary" onclick="confirmPayment()" style="padding:10px 32px;font-size:14px;">我已完成付款</button><div style="font-size:10px;color:var(--text-muted);margin-top:6px;">支付后请联系客服确认开通</div></div><button class="btn btn-ghost btn-sm" onclick="closeModal()">取消</button></div>
         <div id="purchase-step-done" style="display:none;"><div class="payment-success"><div class="ps-icon">🎉</div><div class="ps-title">购买成功！</div><div style="color:var(--text-secondary);margin-bottom:16px;font-size:13px;">您的 <span id="done-tier-name" style="color:var(--accent-hover);font-weight:700;">月卡</span> 已自动激活</div><div class="ps-key" id="done-key">NVS-MON-XXXX-XXXX</div><div class="ps-info" id="done-info"></div></div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;"><button class="btn btn-primary" onclick="copyLicenseKey()">复制密钥</button><button class="btn btn-secondary" onclick="closeModal();openModal('new-project-modal')">开始写作</button></div></div>
@@ -942,7 +934,7 @@
 </div>
 
 <!-- Activate Modal -->
-<div class="modal-overlay" id="activate-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="activate-modal" style="display:none;">
     <div class="modal"><h2>激活会员</h2>
         <div class="form-group"><label>许可证密钥</label><input type="text" id="license-key" placeholder="NVS-MON-XXXX-XXXX" style="font-family:monospace;letter-spacing:1px;"></div>
         <div class="form-group"><label>邮箱（选填）</label><input type="email" id="license-email" placeholder="your@email.com"></div>
@@ -953,7 +945,7 @@
 </div>
 
 <!-- Onboarding Modal -->
-<div class="modal-overlay" id="onboarding-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="onboarding-modal" style="display:none;">
     <div class="modal" style="min-width:480px;max-width:560px;">
         <div id="onboard-step-1"><h2>欢迎使用 Novel Studio</h2><p style="color:var(--text-secondary);font-size:13px;margin:8px 0 20px;">让我们花 30 秒了解你的创作需求</p><div class="form-group"><label>你的写作经验</label><select id="obo-exp" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;"><option value="beginner">新手</option><option value="some">有些经验</option><option value="experienced">有经验</option><option value="pro">资深</option></select></div><div class="form-group"><label>主要创作类型</label><select id="obo-genre" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:13px;"><option value="xuanhuan">玄幻 / 奇幻</option><option value="dushi">都市 / 现实</option><option value="kehuan">科幻</option><option value="xuanyi">悬疑 / 推理</option><option value="yanqing">言情</option><option value="wuxia">武侠 / 仙侠</option><option value="lishi">历史</option><option value="other">其他</option></select></div><div class="form-actions" style="margin-top:20px;"><button class="btn btn-ghost btn-sm" onclick="skipOnboarding()">跳过</button><button class="btn btn-primary" onclick="completeOnboarding()">开始创作</button></div></div>
         <div id="onboard-step-2" style="display:none;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">🎉</div><h2>一切就绪！</h2><p style="color:var(--text-secondary);font-size:13px;margin:8px 0 20px;line-height:1.8;">快速入门：<br>1️⃣ 创建项目<br>2️⃣ 新建章节<br>3️⃣ 使用 AI 续写 / 润色<br><br>开始你的创作之旅！</p><button class="btn btn-primary" onclick="closeOnboarding()" style="padding:12px 40px;">进入写作工作台</button></div>
@@ -961,13 +953,24 @@
 </div>
 
 <!-- Import Modal -->
-<div class="modal-overlay" id="import-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="import-modal" style="display:none;">
     <div class="modal" style="min-width:600px;max-width:700px;max-height:85vh;"><h2>智能导入预览</h2><div id="import-summary" style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);"></div><div id="import-preview" style="max-height:350px;overflow-y:auto;margin-bottom:12px;"></div><div class="import-checkboxes" id="import-checkboxes"></div><div id="import-error" style="display:none;padding:8px 12px;background:#3a1a1a;border-radius:5px;color:#f85149;font-size:12px;margin-bottom:10px;"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">取消</button><button class="btn btn-primary" id="import-apply-btn" onclick="applyImport()">确认导入</button></div></div>
 </div>
 
 <!-- Version History Modal -->
-<div class="modal-overlay" id="version-history-modal" style="display:none;">
+<div class="modal-overlay" role="dialog" aria-modal="true" id="version-history-modal" style="display:none;">
     <div class="modal" style="min-width:600px;max-width:750px;max-height:85vh;"><h2>版本历史</h2><div style="display:flex;gap:16px;max-height:60vh;"><div style="flex:1;overflow-y:auto;border-right:1px solid var(--border);padding-right:12px;" id="version-list"><div style="text-align:center;padding:20px;color:var(--text-muted);">加载中...</div></div><div style="flex:2;overflow-y:auto;" id="version-preview"><pre id="version-preview-content" style="font-size:12px;color:var(--text-secondary);white-space:pre-wrap;font-family:inherit;line-height:1.8;"></pre></div></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">关闭</button><button class="btn btn-primary" id="version-revert-btn" onclick="revertToVersion()" disabled>回退到此版本</button></div></div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title" id="confirm-modal" style="display:none;">
+    <div class="modal" style="min-width:360px;max-width:440px;text-align:center;">
+        <p id="confirm-title" style="color:var(--text-primary);font-size:14px;margin-bottom:20px;line-height:1.6;"></p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button class="btn btn-secondary" id="confirm-cancel-btn">取消</button>
+            <button class="btn btn-danger" id="confirm-ok-btn">确定</button>
+        </div>
+    </div>
 </div>
 
 <!-- Reader Overlay -->

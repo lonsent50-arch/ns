@@ -1,7 +1,9 @@
-name: Deploy
+name: Validate & Deploy
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 jobs:
@@ -12,13 +14,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
       - name: Check Python syntax
-        run: python -m py_compile app.py novel_analyzer.py supabase_client.py supabase_repo.py server.py
+        run: python -m py_compile app.py novel_analyzer.py supabase_client.py supabase_repo.py server.py gen_password_hash.py
 
       - name: Check import integrity
         run: python -c "from novel_analyzer import analyze_cliffhanger_tail, realism_radar, analyze_rhythm, scan_cliches"
+
+      - name: Run unit tests (placeholder)
+        run: echo "No tests configured yet — add tests in tests/ directory"
