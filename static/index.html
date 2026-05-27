@@ -362,7 +362,7 @@
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
                 <option value="deepseek">DeepSeek</option>
-                <option value="claude">Claude</option>
+                <!-- Claude hidden: no API key configured -->
             </select>
             <button class="btn btn-ghost btn-sm" onclick="var cl=document.getElementById('conv-list');if(cl.style.display==='none'){cl.style.display='block';if(typeof loadConversations==='function')loadConversations();}else{cl.style.display='none';}">历史</button>
             <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="window._aiMessages.chat=[];document.getElementById('ai-messages-chat').innerHTML='';">清空</button>
@@ -403,7 +403,7 @@
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
                 <option value="deepseek">DeepSeek</option>
-                <option value="claude">Claude</option>
+                <!-- Claude hidden: no API key configured -->
             </select>
         </div>
         <div class="ai-messages" id="ai-messages-continue" style="flex:1;">
@@ -431,7 +431,7 @@
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
-                <option value="deepseek">DeepSeek</option><option value="claude">Claude</option>
+                <option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured -->
             </select>
         </div>
         <div class="ai-messages" id="ai-messages-polish" style="flex:1;">
@@ -457,7 +457,7 @@
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
-                <option value="deepseek">DeepSeek</option><option value="claude">Claude</option>
+                <option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured -->
             </select>
             <button class="btn btn-primary btn-sm" onclick="detectAiFlavor()" id="detect-ai-btn">检测 AI 味</button>
         </div>
@@ -484,7 +484,7 @@
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
-                <option value="deepseek">DeepSeek</option><option value="claude">Claude</option>
+                <option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured -->
             </select>
         </div>
         <div class="ai-messages" id="ai-messages-brainstorm" style="flex:1;">
@@ -508,7 +508,7 @@
         <div class="direction-bar">
             <span style="font-size:11.5px;color:var(--text-muted);margin-right:8px;">🤖 模型：</span>
             <select class="ai-model-select" onchange="onModelChange(this.value)" style="padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;">
-                <option value="deepseek">DeepSeek</option><option value="claude">Claude</option>
+                <option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured -->
             </select>
         </div>
         <div class="guided-intro"><div class="gi-icon">🧭</div><div class="gi-title">AI 写作引导</div><div class="gi-desc">通过温和的对话，一步步帮你找到创作方向。</div><button class="btn btn-primary" onclick="startGuidedWriting()" id="guided-start-btn">开始引导</button></div>
@@ -530,7 +530,7 @@
     <div class="slideout-header"><h3>📚 一键成书</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
-            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured --></select>
         </div>
         <div id="book-gen-phase-1" class="book-gen-phase"><div style="padding:16px;">
             <div class="form-group"><label>📖 故事构思</label><textarea id="book-gen-premise" rows="4" placeholder="描述你的故事构思..."></textarea></div>
@@ -562,7 +562,7 @@
     <div class="slideout-header"><h3>🎬 转剧本</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
-            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured --></select>
         </div>
         <div style="padding:12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--border);">
             <span style="font-size:12px;">剧本类型：</span>
@@ -584,7 +584,7 @@
     <div class="slideout-header"><h3>💡 灵感 & 题材</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
-            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured --></select>
         </div>
         <div style="padding:16px;">
             <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">选择题材，获取专属灵感</div>
@@ -628,7 +628,7 @@
     <div class="slideout-header"><h3>📝 内容审阅</h3><button class="slideout-close" onclick="closeSlideout()" aria-label="关闭面板" type="button">✕</button></div>
     <div class="slideout-body" style="padding:0;">
         <div class="direction-bar"><span style="font-size:11.5px;color:var(--text-muted);">🤖 模型：</span>
-            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+            <select class="ai-model-select" onchange="onModelChange(this.value)" style="margin-left:8px;padding:5px 8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;"><option value="deepseek">DeepSeek</option><!-- Claude hidden: no API key configured --></select>
         </div>
         <div style="padding:12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--border);">
             <span style="font-size:12px;">审阅类型：</span>
@@ -772,8 +772,8 @@
         <div class="pricing-grid" id="tier-pricing-grid">
             <div class="pricing-card free"><div class="pc-tier">免费版</div><div class="pc-price">¥0</div><div class="pc-period">永久</div><ul class="pc-features"><li>🤖 DeepSeek Chat</li><li>💵 ¥0.01/千tokens</li><li>📝 每日 0.02 元免费额度</li><li>📤 TXT 导出</li></ul><button class="pc-buy-btn" disabled>当前方案</button></div>
             <div class="pricing-card"><div class="pc-tier">基础版</div><div class="pc-price">¥1+</div><div class="pc-period">充值即升</div><ul class="pc-features"><li>🤖 DeepSeek Chat</li><li>⚡ Gemini 2.5 Flash</li><li>💵 ¥0.01~0.04/千tokens</li><li>📤 全格式导出</li></ul><button class="pc-buy-btn" onclick="openSlideout('settings')">充值升级</button></div>
-            <div class="pricing-card popular"><div class="pc-badge">推荐</div><div class="pc-tier">专业版</div><div class="pc-price">¥50+</div><div class="pc-period">充值即升</div><ul class="pc-features"><li>🤖 DeepSeek Chat</li><li>⚡ Gemini 2.5 Flash</li><li>🧠 Claude Sonnet 4</li><li>💵 全模型自由选择</li><li>📤 全部导出格式</li></ul><button class="pc-buy-btn" onclick="openSlideout('settings')" style="background:linear-gradient(135deg, var(--accent2), var(--accent));">充值升级</button></div>
-            <div class="pricing-card"><div class="pc-tier">旗舰版</div><div class="pc-price">¥200+</div><div class="pc-period">充值即升</div><ul class="pc-features"><li>🤖 全部 AI 模型</li><li>🧠 Claude Sonnet 4</li><li>💵 ¥0.12/千tokens</li><li>⭐ 优先技术支持</li><li>📤 全格式导出</li></ul><button class="pc-buy-btn" onclick="openSlideout('settings')">充值升级</button></div>
+            <div class="pricing-card popular"><div class="pc-badge">推荐</div><div class="pc-tier">专业版</div><div class="pc-price">¥50+</div><div class="pc-period">充值即升</div><ul class="pc-features"><li>🤖 DeepSeek Chat</li><li>⚡ Gemini 2.5 Flash</li><li>💵 全模型自由选择</li><li>📤 全部导出格式</li></ul><button class="pc-buy-btn" onclick="openSlideout('settings')" style="background:linear-gradient(135deg, var(--accent2), var(--accent));">充值升级</button></div>
+            <div class="pricing-card"><div class="pc-tier">旗舰版</div><div class="pc-price">¥200+</div><div class="pc-period">充值即升</div><ul class="pc-features"><li>🤖 全部 AI 模型</li><li>💵 ¥0.12/千tokens</li><li>⭐ 优先技术支持</li><li>📤 全格式导出</li></ul><button class="pc-buy-btn" onclick="openSlideout('settings')">充值升级</button></div>
         </div>
         <h3 style="color:var(--text-secondary);margin:20px 0 12px;">📋 交易记录</h3>
         <div id="transaction-list" style="font-size:12px;"><div style="text-align:center;padding:20px;color:var(--text-muted);">加载中...</div></div>
@@ -787,7 +787,7 @@
         <p style="color:var(--text-muted);margin-bottom:24px;font-size:13px;">模型由套餐自动配置，选择默认写作模型偏好</p>
         <div style="background:var(--bg-surface2);border-radius:10px;padding:20px;margin-bottom:16px;">
             <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px;">默认 AI 模型</label>
-            <select id="settings-default-model" style="width:100%;padding:10px 12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:14px;cursor:pointer;"><option value="deepseek">DeepSeek (Chat)</option><option value="claude">Claude (Sonnet 4)</option></select>
+            <select id="settings-default-model" style="width:100%;padding:10px 12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:14px;cursor:pointer;"><option value="deepseek">DeepSeek (Chat)</option><option value="gemini">Gemini (Flash)</option></select>
         </div>
         <div style="background:var(--bg-surface2);border-radius:10px;padding:20px;margin-bottom:16px;">
             <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px;">💎 当前套餐</label>
@@ -802,7 +802,7 @@
             <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px;">🔑 API Key 配置</label>
             <p style="font-size:12px;color:var(--text-muted);line-height:1.6;">API Key 已统一通过 <strong>环境变量</strong> 管理，请在服务器 <code>.env</code> 文件中配置以下变量：<br><br>
             <code style="color:var(--accent);">DEEPSEEK_API_KEY</code><br>
-            <code style="color:var(--accent);">CLAUDE_API_KEY</code><br>
+            <!-- Claude hidden: no API key configured -->
             <code style="color:var(--accent);">GEMINI_API_KEY</code><br><br>
             修改后需要重启服务生效。</p>
         </div>
