@@ -63,13 +63,13 @@
         </div>
 
         <!-- Quick actions -->
-        <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0;">
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('projects')" title="项目">📁</button>
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('characters')" title="角色">👤</button>
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('outline')" title="大纲">📋</button>
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('worldbuilding')" title="设定">🌐</button>
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('stats')" title="统计">📊</button>
-            <button class="btn btn-ghost btn-sm" onclick="openSlideout('settings')" title="设置" style="margin-left:auto;">⚙️</button>
+        <div class="sidebar-toolbar">
+            <button class="sidebar-btn" onclick="openSlideout('projects')" title="项目管理"><span class="sidebar-btn-icon">📁</span><span class="sidebar-btn-text">项目</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('characters')" title="角色管理"><span class="sidebar-btn-icon">👤</span><span class="sidebar-btn-text">角色</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('outline')" title="情节大纲"><span class="sidebar-btn-icon">📋</span><span class="sidebar-btn-text">大纲</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('worldbuilding')" title="世界观设定"><span class="sidebar-btn-icon">🌐</span><span class="sidebar-btn-text">设定</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('stats')" title="写作统计"><span class="sidebar-btn-icon">📊</span><span class="sidebar-btn-text">统计</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('settings')" title="设置与套餐"><span class="sidebar-btn-icon">⚙️</span><span class="sidebar-btn-text">设置</span></button>
         </div>
     </div>
 
@@ -109,12 +109,19 @@
         <div class="editor-wrap" id="editor-wrap" style="display:none;">
             <div class="editor-toolbar">
                 <input type="text" class="editor-title-input" id="editor-title" placeholder="章节标题" onchange="saveCurrentChapter()">
-                <div class="ch-meta">
-                    <span id="editor-wordcount">0 字</span>
-                    <button class="btn btn-ghost btn-sm" onclick="deleteCurrentChapter()" title="删除" aria-label="删除章节" type="button">🗑</button>
-                    <button class="btn btn-ghost btn-sm" onclick="triggerAiContinue()" title="AI续写">🤖</button>
-                    <button class="btn btn-ghost btn-sm" onclick="openSlideout('ai-polish')" title="润色">✨</button>
-                    <button class="btn btn-ghost btn-sm" onclick="generateHealthReport()" title="健康度报告" style="color:var(--accent);">🩺</button>
+                <div class="ch-nav">
+                    <button class="ch-nav-btn" onclick="navigateChapter(-1)" title="上一章" aria-label="上一章">◀</button>
+                    <span class="ch-nav-info" id="ch-nav-info">1/1</span>
+                    <button class="ch-nav-btn" onclick="navigateChapter(1)" title="下一章" aria-label="下一章">▶</button>
+                </div>
+                <span class="ch-save-status" id="ch-save-status" title="保存状态">💾 已保存</span>
+                <span id="editor-wordcount">0 字</span>
+                <div class="ch-actions">
+                    <button class="ch-action-btn" onclick="toggleFullscreen()" title="全屏写作 (F11)" aria-label="全屏">⛶</button>
+                    <button class="ch-action-btn" onclick="triggerAiContinue()" title="AI 续写 (Ctrl+Enter)" aria-label="AI续写">🤖</button>
+                    <button class="ch-action-btn" onclick="openSlideout('ai-polish')" title="AI 润色" aria-label="润色">✨</button>
+                    <button class="ch-action-btn" onclick="generateHealthReport()" title="健康度报告" aria-label="健康度" style="color:var(--accent);">🩺</button>
+                    <button class="ch-action-btn ch-action-delete" onclick="deleteCurrentChapter()" title="删除本章" aria-label="删除章节">🗑</button>
                 </div>
             </div>
 
@@ -1463,6 +1470,8 @@ function onEditorInput() {
     if (wcEditor) wcEditor.textContent = wc.toLocaleString() + ' 字';
     // Track activity for writing timer
     if (typeof _lastActivityTime !== 'undefined') _lastActivityTime = Date.now();
+    // Mark dirty
+    if (typeof updateSaveStatus === 'function') updateSaveStatus('dirty');
 
     // 50ms 本地死锁：每次按键后极速写入 IndexedDB
     if (window._idxDBTimer) clearTimeout(window._idxDBTimer);

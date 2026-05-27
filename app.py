@@ -1461,7 +1461,7 @@ def build_condensed_context(project_id, current_chapter_id=None):
         # 5. 登场人物标签
         char_tags = _build_character_tags(project_id, current_chapter_id)
         if char_tags:
-            parts.append(f'【登场人物标签】\n{char_tags}')
+            parts.append(f'【登场人物设定——必须严格遵守】\n{char_tags}')
 
         return '\n\n'.join(parts) if parts else ''
 
@@ -1567,7 +1567,7 @@ def build_condensed_context(project_id, current_chapter_id=None):
     # 5. [本章登场人物极简标签]
     char_tags = _build_character_tags(project_id, current_chapter_id, conn)
     if char_tags:
-        parts.append(f'【登场人物标签】\n{char_tags}')
+        parts.append(f'【登场人物设定——必须严格遵守】\n{char_tags}')
 
     conn.close()
     return '\n\n'.join(parts) if parts else ''
@@ -1599,8 +1599,7 @@ def _get_or_generate_summary(conn, chapter_row, max_chars=500):
 
 
 def _build_character_tags(project_id, current_chapter_id, conn=None):
-    """构建登场人物极简标签：每人姓名 + 性格关键词 + 目标"""
-    # Supabase 模式
+    """构建登场人物上下文标签：每人姓名 + 性格 + 外貌 + 背景 + 目标，确保AI不写偏角色"""
     repo = get_repo()
     if repo:
         chars = repo.list_characters(project_id)
@@ -1608,14 +1607,16 @@ def _build_character_tags(project_id, current_chapter_id, conn=None):
             return ''
         tags = []
         for c in chars[:6]:
-            tag = f'{c.get("name", "")}'
+            parts = [f'{c.get("name", "")}']
             if c.get('personality'):
-                pers = c['personality'].replace('\n', ' ').strip()[:40]
-                tag += f'：{pers}'
+                parts.append(f'性格：{c["personality"].replace(chr(10), " ").strip()[:80]}')
+            if c.get('appearance'):
+                parts.append(f'外貌：{c["appearance"].replace(chr(10), " ").strip()[:60]}')
+            if c.get('background'):
+                parts.append(f'背景：{c["background"].replace(chr(10), " ").strip()[:80]}')
             if c.get('goal'):
-                goal = c['goal'].replace('\n', ' ').strip()[:30]
-                tag += f' | 目标：{goal}'
-            tags.append(f'- {tag}')
+                parts.append(f'目标：{c["goal"].replace(chr(10), " ").strip()[:50]}')
+            tags.append('- ' + ' | '.join(parts))
         return '\n'.join(tags)
 
     own_conn = False
@@ -1624,7 +1625,7 @@ def _build_character_tags(project_id, current_chapter_id, conn=None):
         own_conn = True
 
     chars = conn.execute(
-        'SELECT name, personality, goal, appearance FROM characters ORDER BY created_at'
+        'SELECT name, personality, goal, background, appearance FROM characters ORDER BY created_at'
     ).fetchall()
 
     if not chars:
@@ -1632,18 +1633,18 @@ def _build_character_tags(project_id, current_chapter_id, conn=None):
             conn.close()
         return ''
 
-    # 取最多 6 个角色
     tags = []
     for c in chars[:6]:
-        tag = f'{c["name"]}'
+        parts = [f'{c["name"]}']
         if c['personality']:
-            # 取性格前 30 字
-            pers = c['personality'].replace('\n', ' ').strip()[:40]
-            tag += f'：{pers}'
+            parts.append(f'性格：{c["personality"].replace(chr(10), " ").strip()[:80]}')
+        if c['appearance']:
+            parts.append(f'外貌：{c["appearance"].replace(chr(10), " ").strip()[:60]}')
+        if c['background']:
+            parts.append(f'背景：{c["background"].replace(chr(10), " ").strip()[:80]}')
         if c['goal']:
-            goal = c['goal'].replace('\n', ' ').strip()[:30]
-            tag += f' | 目标：{goal}'
-        tags.append(f'- {tag}')
+            parts.append(f'目标：{c["goal"].replace(chr(10), " ").strip()[:50]}')
+        tags.append('- ' + ' | '.join(parts))
 
     if own_conn:
         conn.close()
@@ -1687,6 +1688,36 @@ def _extract_outline_keywords(project_id):
             if 2 <= len(w) <= 12 and w not in ('本章', '章节', '情节', '故事', '一个', '这个', '那个'):
                 keywords.add(w)
     return list(keywords)
+
+
+def _quick_quality_scan(content, project_id, chapter_id=None):
+    """AI 生成后轻量级质量扫描，检查角色/大纲/逻辑一致性。
+    返回警告列表，无问题则返回空列表。
+    """
+    warnings = []
+    if not content or not content.strip():
+        return warnings
+
+    repo = get_repo()
+    if repo:
+        # 1. 角色名检查：大纲中提及的主要角色是否在生成内容中出现
+        chars = repo.list_characters(project_id)
+        if chars:
+            core_chars = [c for c in chars if c.get('is_core')][:3] or chars[:3]
+            for c in core_chars:
+                name = c.get('name', '')
+                if name and len(name) >= 2 and name not in content:
+                    warnings.append(f'核心角色「{name}」未在续写内容中出现')
+
+        # 2. 大纲关键词匹配检查
+        if chapter_id:
+            keywords = _extract_outline_keywords(project_id)
+            if keywords:
+                hit_count = sum(1 for kw in keywords if kw in content)
+                if hit_count < max(1, len(keywords) * 0.3):
+                    warnings.append(f'大纲关键词命中率低（{hit_count}/{len(keywords)}），可能偏离主线')
+
+    return warnings
 
 
 @app.route('/api/projects/<project_id>/ai/check-plot-deviation', methods=['POST'])
@@ -3395,14 +3426,24 @@ def ai_result(result, model=None, endpoint='ai'):
         return jsonify({'error': result[14:]}), 429
     if isinstance(result, str) and result.startswith('__INSUFFICIENT_BALANCE__'):
         return jsonify({'error': result[22:], 'code': 'insufficient_balance'}), 402
+
+    if isinstance(result, dict):
+        content = result.get('content', '')
+        quality_warnings = result.get('quality_warnings', [])
+    else:
+        content = result
+        quality_warnings = []
+
     billing = _get_billing()
+    resp = {
+        'content': content,
+        'model': model or get_setting('default_model', 'deepseek'),
+    }
     if billing:
-        return jsonify({
-            'content': result,
-            'model': model or get_setting('default_model', 'deepseek'),
-            'billing': billing
-        })
-    return jsonify({'content': result, 'model': model or get_setting('default_model', 'deepseek')})
+        resp['billing'] = billing
+    if quality_warnings:
+        resp['quality_warnings'] = quality_warnings
+    return jsonify(resp)
 
 def call_ai(messages, model=None, temperature=0.7, max_tokens=2000, endpoint='ai'):
     """统一 AI 调用入口，路由到对应 API 并自动计费（含重试+限流）"""
@@ -3484,10 +3525,33 @@ def ai_continue_writing(project_id):
         context_block = f'【大纲锚定信息】请严格参照以下信息续写，确保不偏离主线：\n{condensed}\n\n'
 
     messages = [
-        {'role': 'system', 'content': SURVIVAL_REALISM_HARDENING + '\n' + BAIMIAO_HARDENING + '\n' + '你是一位优秀的小说作家。保持原有文风和人物性格，自然流畅地继续创作。你必须保持原创性：不要使用网文常见套路（如"嘴角微扬""眼中闪过一丝"等模板句式），不要复制经典桥段，每个情节转折都应该是新鲜的、不可预测的。避免AI式的过度工整排比。用真实的感官细节替代抽象形容。直接输出续写内容，不要加任何解释。'},
+        {'role': 'system', 'content': SURVIVAL_REALISM_HARDENING + '\n' + BAIMIAO_HARDENING + '\n' +
+            '你是一位优秀的小说作家。保持原有文风和人物性格，自然流畅地继续创作。\n\n'
+            '【人物一致性铁律】\n'
+            '1. 每个角色的性格、说话方式、行为动机必须与设定严格一致，绝不越界\n'
+            '2. 角色不能突然改变立场或能力级别，除非有明确的剧情转折铺垫\n'
+            '3. 对话必须体现角色的独特性格和出身背景，不同角色语气应有明显差异\n'
+            '4. 已死亡/已离场的角色不能再次出现\n\n'
+            '【情节一致性铁律】\n'
+            '1. 严格对照大纲锚定信息，续写内容必须推进大纲指定的主线\n'
+            '2. 不要引入大纲中不存在的新势力/新角色/新设定\n'
+            '3. 前文埋下的伏笔和线索需要延续，不能无故消失\n'
+            '4. 每个情节转折都应该是新鲜的、不可预测的\n\n'
+            '【写作质量铁律】\n'
+            '1. 不使用网文常见套路（如"嘴角微扬""眼中闪过一丝"等模板句式）\n'
+            '2. 避免AI式的过度工整排比，句子长短要有变化\n'
+            '3. 用真实的感官细节（触觉/听觉/嗅觉/视觉）替代抽象形容\n'
+            '4. 直接输出续写内容，不要加任何解释和标注'},
         {'role': 'user', 'content': f'{context_block}当前章节末尾内容：\n{recent_content}\n\n{prompt}'}
     ]
     result = call_ai(messages, model=data.get('model'), temperature=0.75, max_tokens=2000)
+
+    # Post-write quality scan
+    if isinstance(result, str) and not result.startswith(('错误', '__')):
+        quality_warnings = _quick_quality_scan(result, project_id, current_chapter_id)
+        if quality_warnings:
+            result = {'content': result, 'quality_warnings': quality_warnings}
+
     return ai_result(result, data.get('model'))
 
 @app.route('/api/projects/<project_id>/ai/polish', methods=['POST'])
@@ -3737,22 +3801,34 @@ def ai_continue_writing_v2(project_id):
 
     messages = [
         {'role': 'system', 'content': SURVIVAL_REALISM_HARDENING + '\n' + BAIMIAO_HARDENING + '\n' + f'''你是一位优秀的小说作家，擅长续写故事。
-你必须严格遵守以下原则：
-1. 保持原有文风和人物性格，不要突然改变
-2. 自然流畅地继续创作，不要突兀转折
-3. 情节发展要合理，不能偏离已建立的世界观
-4. 对话要有角色特色，不同角色语气要有区分
-5. 注意与前文的细节呼应，不要遗忘已埋下的伏笔
-6. 避免使用AI常见的套话和过度工整的句式，让文字自然
-7. 保持原创性：不要复制任何已知作品的桥段和经典情节
-8. 拒绝网文模板：避免"废柴觉醒""系统认主""退婚打脸"等套路
-9. 用具体而独特的细节代替抽象和通用的描写
-10. 每一个情节转折都应该让读者感到新鲜、不可预测
-直接输出续写内容，不要加"以下是续写"之类的解释。''',
-        },
+
+【人物一致性铁律】
+1. 每个角色的性格、说话方式、行为动机必须与设定严格一致，绝不越界
+2. 角色不能突然改变立场或能力级别，除非有明确的剧情转折铺垫
+3. 对话必须体现角色的独特性格和出身背景，不同角色语气应有明显差异
+4. 已死亡/已离场的角色不能再次出现
+
+【情节一致性铁律】
+1. 严格对照大纲锚定信息，续写内容必须推进大纲指定的主线
+2. 不要引入大纲中不存在的新势力/新角色/新设定
+3. 前文埋下的伏笔和线索需要延续，不能无故消失
+4. 每一个情节转折都应该让读者感到新鲜、不可预测
+
+【写作质量铁律】
+1. 避免使用AI常见的套话和过度工整的句式，让文字自然
+2. 用具体而独特的感官细节代替抽象和通用的描写
+3. 句子长短要有变化，节奏要有起伏
+4. 直接输出续写内容，不要加任何解释和标注'''},
         {'role': 'user', 'content': f'{context_block}当前章节末尾内容：\n{context}\n\n{direction_text}{prompt}'}
     ]
     result = call_ai(messages, model=data.get('model'), temperature=0.75, max_tokens=2000)
+
+    # Post-write quality scan
+    if isinstance(result, str) and not result.startswith(('错误', '__')):
+        quality_warnings = _quick_quality_scan(result, project_id, chapter_id)
+        if quality_warnings:
+            result = {'content': result, 'quality_warnings': quality_warnings}
+
     return ai_result(result, data.get('model'))
 
 # ===== 导出 API =====

@@ -610,6 +610,8 @@ async function selectChapter(cid) {
     }
     renderStoryTree();
     renderDashboard();
+    updateChapterNav();
+    updateSaveStatus('saved');
 }
 
 async function createChapter() {
@@ -643,6 +645,7 @@ async function deleteCurrentChapter() {
 
 async function saveCurrentChapter() {
     if (!currentChapterId || !currentProjectId) return;
+    updateSaveStatus('saving');
     var titleEl = document.getElementById('editor-title');
     var title = titleEl ? titleEl.value : '';
     var content = getEditorContent();
@@ -650,6 +653,7 @@ async function saveCurrentChapter() {
     if (res && res.success) {
         const ch = chapters.find(c=>c.id===currentChapterId);
         if (ch) { ch.title=title; ch.word_count=res.word_count; }
+        updateSaveStatus('saved');
         var statusEl = document.getElementById('status-saved');
         if (statusEl) statusEl.textContent = '已保存 '+new Date().toLocaleTimeString();
         var wcDisp = document.getElementById('wc-display');
@@ -658,8 +662,10 @@ async function saveCurrentChapter() {
             NovelDB.markSynced(currentProjectId, currentChapterId, content);
         }
     } else if (res && res.error) {
+        updateSaveStatus('error');
         showToast('保存失败: ' + res.error, 'error');
     } else {
+        updateSaveStatus('error');
         showToast('保存失败: 网络异常，草稿已保留在本地', 'error');
     }
 }
@@ -686,6 +692,74 @@ async function loadCharacters() {
         if (typeof updatePovCharSelector === 'function') updatePovCharSelector();
     }
 }
+
+// ===== Chapter Navigation =====
+function navigateChapter(direction) {
+    if (!chapters || chapters.length === 0) return;
+    var idx = chapters.findIndex(function(c) { return c.id === currentChapterId; });
+    if (idx === -1) idx = 0;
+    var newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= chapters.length) {
+        if (direction === -1) showToast('已经是第一章', 'info');
+        else showToast('已经是最后一章', 'info');
+        return;
+    }
+    selectChapter(chapters[newIdx].id);
+    updateChapterNav();
+}
+
+function updateChapterNav() {
+    var el = document.getElementById('ch-nav-info');
+    if (!el || !chapters) return;
+    var idx = chapters.findIndex(function(c) { return c.id === currentChapterId; });
+    if (idx === -1) idx = 0;
+    el.textContent = (idx + 1) + '/' + chapters.length;
+}
+
+// ===== Save Status Indicator =====
+function updateSaveStatus(status) {
+    var el = document.getElementById('ch-save-status');
+    if (!el) return;
+    if (status === 'saving') {
+        el.textContent = '💾 保存中...'; el.className = 'ch-save-status saving';
+    } else if (status === 'saved') {
+        el.textContent = '✅ 已保存'; el.className = 'ch-save-status saved';
+        clearTimeout(window._saveStatusTimer);
+        window._saveStatusTimer = setTimeout(function() {
+            el.textContent = '💾 已保存'; el.className = 'ch-save-status';
+        }, 2000);
+    } else if (status === 'error') {
+        el.textContent = '❌ 保存失败'; el.className = 'ch-save-status error';
+    } else if (status === 'dirty') {
+        el.textContent = '✏️ 未保存'; el.className = 'ch-save-status';
+    }
+}
+
+// ===== Fullscreen Toggle =====
+function toggleFullscreen() {
+    var wrap = document.getElementById('editor-wrap');
+    if (!wrap) return;
+    wrap.classList.toggle('fullscreen');
+    var btn = document.querySelector('.ch-action-btn[title*="全屏"]');
+    if (btn) {
+        btn.textContent = wrap.classList.contains('fullscreen') ? '⛶' : '⛶';
+    }
+    // Focus editor when entering fullscreen
+    if (wrap.classList.contains('fullscreen')) {
+        var body = document.getElementById('editor-body');
+        if (body) body.focus();
+    }
+}
+
+// ESC to exit fullscreen
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var wrap = document.getElementById('editor-wrap');
+        if (wrap && wrap.classList.contains('fullscreen')) {
+            wrap.classList.remove('fullscreen');
+        }
+    }
+});
 
 function renderCharacterList() {
     const list = document.getElementById('character-list');
@@ -2074,13 +2148,24 @@ async function continueWithDirection() {
         });
         const data = await res.json();
         if (lel) lel.style.display = 'none';
-        
+
         const aiDiv = document.createElement('div');
         aiDiv.className = 'ai-msg assistant';
         aiDiv.innerHTML = '<div class="msg-role">AI 续写</div><div>'+escHtml(data.content||'').replace(/\n/g,'<br>')+'</div>';
         container.appendChild(aiDiv);
+
+        // Quality warnings
+        if (data.quality_warnings && data.quality_warnings.length > 0) {
+            var warnDiv = document.createElement('div');
+            warnDiv.className = 'ai-msg quality-warn';
+            warnDiv.innerHTML = '<div class="msg-role">⚠️ 质量提醒</div><div>' +
+                data.quality_warnings.map(function(w){ return '• '+escHtml(w); }).join('<br>') + '</div>';
+            container.appendChild(warnDiv);
+            showToast('续写完成，有 ' + data.quality_warnings.length + ' 条质量提醒', 'info');
+        }
+
         container.scrollTop = container.scrollHeight;
-        
+
         // 自动插入续写内容
         if (data.content && currentChapterId) {
             setEditorContent(getEditorContent() + '\n\n' + data.content);

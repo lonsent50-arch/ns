@@ -919,6 +919,88 @@ body::before {
 }
 .btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+/* --- Sidebar toolbar --- */
+.sidebar-toolbar {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 8px 10px; border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.sidebar-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; background: transparent; border: 1px solid transparent;
+    border-radius: var(--radius-sm); cursor: pointer; transition: all var(--transition);
+    color: var(--text-muted); font-size: 12px; font-family: inherit;
+    white-space: nowrap;
+}
+.sidebar-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+.sidebar-btn .sidebar-btn-icon { font-size: 14px; }
+.sidebar-btn .sidebar-btn-text { font-weight: 500; }
+
+/* --- Editor toolbar --- */
+.editor-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; background: rgba(12,12,18,0.75);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+    flex-wrap: wrap; min-height: 44px;
+}
+.editor-toolbar .ch-title { flex: 0 1 auto; min-width: 140px; }
+.editor-toolbar .editor-title-input {
+    flex: 1; min-width: 120px; padding: 6px 12px; background: transparent;
+    border: 0.5px solid transparent; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: 16px; font-weight: 700;
+    outline: none; font-family: inherit; transition: all var(--transition);
+}
+.editor-toolbar .editor-title-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.02); }
+
+/* Chapter navigation */
+.ch-nav { display: flex; align-items: center; gap: 2px; }
+.ch-nav-btn {
+    width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+    color: var(--text-muted); cursor: pointer; font-size: 11px; transition: all var(--transition);
+}
+.ch-nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+.ch-nav-info {
+    font-size: 11px; color: var(--text-muted); min-width: 28px; text-align: center;
+    user-select: none;
+}
+
+/* Save status */
+.ch-save-status {
+    font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px;
+    transition: color 0.3s; white-space: nowrap;
+}
+.ch-save-status.saving { color: var(--warning); }
+.ch-save-status.saved { color: var(--success); }
+.ch-save-status.error { color: var(--red); }
+
+/* Chapter actions */
+.ch-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.ch-action-btn {
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+    color: var(--text-secondary); cursor: pointer; font-size: 14px; transition: all var(--transition);
+    position: relative;
+}
+.ch-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+.ch-action-btn::after {
+    content: attr(title); position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-surface2); color: var(--text-primary); font-size: 10px; padding: 2px 8px;
+    border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0;
+    transition: opacity 0.15s; z-index: 100;
+}
+.ch-action-btn:hover::after { opacity: 1; }
+.ch-action-delete:hover { background: rgba(255,69,58,0.15); color: var(--red); }
+
+/* Fullscreen editor */
+.editor-wrap.fullscreen {
+    position: fixed; inset: 0; z-index: 5000; background: var(--bg-base);
+}
+.editor-wrap.fullscreen .editor-body { padding: 48px 20%; font-size: 18px; }
+@media(max-width:1200px) { .editor-wrap.fullscreen .editor-body { padding: 40px 12%; } }
+@media(max-width:768px) { .editor-wrap.fullscreen .editor-body { padding: 32px 8%; font-size: 16px; } }
+
 /* ================================================================
    MODAL
    ================================================================ */
@@ -1376,6 +1458,8 @@ body::before {
 }
 .ai-msg.user .msg-role { color: var(--accent-hover); }
 .ai-msg.assistant .msg-role { color: var(--green); }
+.quality-warn { background: rgba(255,204,0,0.06); border-left: 3px solid var(--warning); }
+.quality-warn .msg-role { color: var(--warning); }
 
 .ai-input-wrap {
     padding: 10px 16px 12px; border-top: 0.5px solid var(--border);
