@@ -488,27 +488,6 @@ body::before {
 .editor-body-wrap {
     flex: 1; position: relative; overflow: hidden;
 }
-.editor-toolbar {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 20px; background: rgba(12,12,18,0.75);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.editor-toolbar .ch-title {
-    flex: 1; font-size: 14px; font-weight: 600;
-    color: var(--text-primary);
-}
-.editor-toolbar .ch-meta {
-    font-size: 12px; color: var(--text-muted);
-    display: flex; align-items: center; gap: 10px;
-}
-.editor-title-input {
-    flex: 1; padding: 8px 16px; background: transparent;
-    border: 0.5px solid transparent; border-radius: var(--radius-sm);
-    color: var(--text-primary); font-size: 18px; font-weight: 700;
-    outline: none; font-family: inherit; transition: all var(--transition);
-}
-.editor-title-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.02); }
 
 .editor-body {
     flex: 1; overflow-y: auto; padding: 32px 48px;
@@ -984,13 +963,6 @@ body::before {
     position: relative;
 }
 .ch-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
-.ch-action-btn::after {
-    content: attr(title); position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%);
-    background: var(--bg-surface2); color: var(--text-primary); font-size: 10px; padding: 2px 8px;
-    border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0;
-    transition: opacity 0.15s; z-index: 100;
-}
-.ch-action-btn:hover::after { opacity: 1; }
 .ch-write-btn { color: var(--accent) !important; border: 1px solid rgba(10,132,255,0.3) !important; }
 .ch-write-btn:hover { background: rgba(10,132,255,0.12) !important; border-color: var(--accent) !important; }
 .ch-action-delete:hover { background: rgba(255,69,58,0.15); color: var(--red); }
