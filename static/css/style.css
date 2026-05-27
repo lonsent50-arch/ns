@@ -908,7 +908,7 @@ body::before {
 /* --- Sidebar toolbar --- */
 .sidebar-toolbar {
     display: flex; flex-wrap: wrap; gap: 4px;
-    padding: 8px 10px; border-top: 1px solid var(--border);
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 .sidebar-btn {

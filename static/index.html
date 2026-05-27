@@ -41,6 +41,16 @@
         </div>
         <button class="btn-new-project" onclick="openModal('new-project-modal')">＋ 新建项目</button>
 
+        <!-- Quick actions -->
+        <div class="sidebar-toolbar">
+            <button class="sidebar-btn" onclick="openSlideout('projects')" title="项目管理"><span class="sidebar-btn-icon">📁</span><span class="sidebar-btn-text">项目</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('characters')" title="角色管理"><span class="sidebar-btn-icon">👤</span><span class="sidebar-btn-text">角色</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('outline')" title="情节大纲"><span class="sidebar-btn-icon">📋</span><span class="sidebar-btn-text">大纲</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('worldbuilding')" title="世界观设定"><span class="sidebar-btn-icon">🌐</span><span class="sidebar-btn-text">设定</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('stats')" title="写作统计"><span class="sidebar-btn-icon">📊</span><span class="sidebar-btn-text">统计</span></button>
+            <button class="sidebar-btn" onclick="openSlideout('settings')" title="设置与套餐"><span class="sidebar-btn-icon">⚙️</span><span class="sidebar-btn-text">设置</span></button>
+        </div>
+
         <!-- Story Tree -->
         <div class="tree-section" id="story-tree">
             <div class="empty-state" style="padding:40px 16px;">
@@ -62,15 +72,6 @@
             </div>
         </div>
 
-        <!-- Quick actions -->
-        <div class="sidebar-toolbar">
-            <button class="sidebar-btn" onclick="openSlideout('projects')" title="项目管理"><span class="sidebar-btn-icon">📁</span><span class="sidebar-btn-text">项目</span></button>
-            <button class="sidebar-btn" onclick="openSlideout('characters')" title="角色管理"><span class="sidebar-btn-icon">👤</span><span class="sidebar-btn-text">角色</span></button>
-            <button class="sidebar-btn" onclick="openSlideout('outline')" title="情节大纲"><span class="sidebar-btn-icon">📋</span><span class="sidebar-btn-text">大纲</span></button>
-            <button class="sidebar-btn" onclick="openSlideout('worldbuilding')" title="世界观设定"><span class="sidebar-btn-icon">🌐</span><span class="sidebar-btn-text">设定</span></button>
-            <button class="sidebar-btn" onclick="openSlideout('stats')" title="写作统计"><span class="sidebar-btn-icon">📊</span><span class="sidebar-btn-text">统计</span></button>
-            <button class="sidebar-btn" onclick="openSlideout('settings')" title="设置与套餐"><span class="sidebar-btn-icon">⚙️</span><span class="sidebar-btn-text">设置</span></button>
-        </div>
     </div>
 
     <!-- ===== CENTER COLUMN: Console + Editor ===== -->
