@@ -923,7 +923,6 @@ body::before {
     border-bottom: 1px solid var(--border); flex-shrink: 0;
     flex-wrap: wrap; min-height: 44px;
 }
-.editor-toolbar .ch-title { flex: 0 1 auto; min-width: 140px; }
 .editor-toolbar .editor-title-input {
     flex: 1; min-width: 120px; padding: 6px 12px; background: transparent;
     border: 0.5px solid transparent; border-radius: var(--radius-sm);
@@ -1947,7 +1946,7 @@ body::before {
 
     .editor-body { padding: 20px 24px; font-size: 15px; }
     .editor-toolbar { padding: 8px 14px; }
-    .editor-toolbar .ch-title { font-size: 17px; }
+    .editor-toolbar .editor-title-input { font-size: 17px; }
 
     .modal { max-width: 90vw; padding: 20px 18px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -1965,7 +1964,8 @@ body::before {
 
     .editor-body { padding: 14px 14px; font-size: 14px; line-height: 1.7; }
     .editor-toolbar { padding: 6px 10px; flex-wrap: wrap; gap: 6px; }
-    .editor-toolbar .ch-title { font-size: 15px; }
+    .editor-toolbar .editor-title-input { font-size: 15px; }
+    .ch-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-end; padding-top: 2px; }
     .editor-status { padding: 4px 8px; font-size: 9px; gap: 5px; }
 
     .slideout-panel { width: 100vw; max-width: 100vw; right: -100vw; }
@@ -2006,8 +2006,8 @@ body::before {
 
     .editor-body { padding: 10px 10px; font-size: 13px; line-height: 1.65; }
     .editor-toolbar { padding: 4px 8px; gap: 4px; }
-    .editor-toolbar .ch-title { font-size: 14px; }
-    .editor-toolbar .ch-meta { font-size: 10px; }
+    .editor-toolbar .editor-title-input { font-size: 14px; }
+    .ch-actions { flex-basis: 100%; margin-left: 0; justify-content: flex-end; }
 
     .btn-new-project { padding: 8px; font-size: 12px; margin: 8px 10px; width: calc(100% - 20px); }
 
