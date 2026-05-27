@@ -650,10 +650,13 @@ async function saveCurrentChapter() {
         if (statusEl) statusEl.textContent = '已保存 '+new Date().toLocaleTimeString();
         var wcDisp = document.getElementById('wc-display');
         if (wcDisp) wcDisp.textContent = (res.word_count||0).toLocaleString()+' 字';
-        // 稿件安全生命线：标记 IndexedDB 草稿为已同步
         if (typeof NovelDB !== 'undefined') {
             NovelDB.markSynced(currentProjectId, currentChapterId, content);
         }
+    } else if (res && res.error) {
+        showToast('保存失败: ' + res.error, 'error');
+    } else {
+        showToast('保存失败: 网络异常，草稿已保留在本地', 'error');
     }
 }
 

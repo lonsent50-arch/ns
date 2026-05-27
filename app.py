@@ -5336,9 +5336,18 @@ _ADMIN_TOKENS = {}  # {token: expires_at_timestamp}
 _ADMIN_TOKEN_TTL = 86400  # 24 小时过期
 
 if not ADMIN_PASSWORD_HASH:
-    raise RuntimeError('[Novel Studio] 启动失败：ADMIN_PASSWORD_HASH 环境变量未设置。请运行: python3 -c "import hashlib; print(hashlib.sha256(input(\"新密码: \").encode()).hexdigest())" 并将结果配置为环境变量。')
+    raise RuntimeError('[Novel Studio] 启动失败：ADMIN_PASSWORD_HASH 环境变量未设置。'
+                       '请运行 python3 gen_password_hash.py 并将结果配置为环境变量。')
 
 def verify_admin_password(password):
+    """验证管理员密码，支持 SHA-256（旧格式）和 PBKDF2（新格式）"""
+    if ADMIN_PASSWORD_HASH.startswith('pbkdf2:'):
+        # 新格式: pbkdf2:salt_hex:key_hex
+        _, salt_hex, key_hex = ADMIN_PASSWORD_HASH.split(':')
+        salt = bytes.fromhex(salt_hex)
+        key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+        return key.hex() == key_hex
+    # 旧格式: 纯 SHA-256 hex（向后兼容）
     return hashlib.sha256(password.encode()).hexdigest() == ADMIN_PASSWORD_HASH
 
 def _cleanup_expired_tokens():
@@ -5802,7 +5811,11 @@ def admin_verify():
     if verify_admin_password(data.get('password', '')):
         token = 'admin-' + secrets.token_hex(32)
         _ADMIN_TOKENS[token] = time.time() + _ADMIN_TOKEN_TTL
-        return jsonify({'token': token, 'expires_in': _ADMIN_TOKEN_TTL})
+        resp = {'token': token, 'expires_in': _ADMIN_TOKEN_TTL}
+        # 旧格式密码哈希提示升级
+        if not ADMIN_PASSWORD_HASH.startswith('pbkdf2:'):
+            resp['security_notice'] = '建议升级密码哈希为 PBKDF2 格式，运行 python3 gen_password_hash.py'
+        return jsonify(resp)
     return jsonify({'error': '密码错误'}), 403
 
 @app.route('/api/admin/licenses', methods=['GET'])
