@@ -81,6 +81,7 @@
                 <div class="ws-progress-text" id="ws-progress-text">0/0章</div>
             </div>
             <div class="ws-left-nav">
+                <button class="ws-nav-btn" onclick="Outline.show()">📋 大纲</button>
                 <button class="ws-nav-btn" onclick="Characters.show()">👤 角色管理</button>
                 <button class="ws-nav-btn" onclick="Memory.show()">🧠 记忆系统</button>
                 <button class="ws-nav-btn" onclick="NS.navigate('#publish/' + NS.getState('projectId'))">📦 发布上线</button>
@@ -153,6 +154,15 @@
     <div class="config-container" id="config-container"></div>
 </div>
 
+<!-- Outline Slideout -->
+<div id="outline-slideout" class="slideout-panel" style="display:none;">
+    <div class="slideout-header">
+        <span>📋 故事大纲</span>
+        <button class="slideout-close" onclick="Outline.hide()">✕</button>
+    </div>
+    <div class="slideout-body" id="outline-slideout-body"></div>
+</div>
+
 <!-- Global containers -->
 <div id="modal-overlay" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()"></div>
 <div id="toast-container" class="toast-container"></div>
@@ -162,6 +172,7 @@
 <script src="/static/js/workspace.js"></script>
 <script src="/static/js/tree.js"></script>
 <script src="/static/js/ai-panel.js"></script>
+<script src="/static/js/outline.js"></script>
 <script src="/static/js/characters.js"></script>
 <script src="/static/js/memory.js"></script>
 <script src="/static/js/publish.js"></script>

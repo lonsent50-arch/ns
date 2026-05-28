@@ -136,6 +136,9 @@
     .char-card-avatar { width: 28px; height: 28px; font-size: 12px; }
     .char-card-name { font-size: 12px; }
 
+    /* --- Slideout: full width on mobile --- */
+    .slideout-panel { width: 100vw; max-width: 100vw; }
+
     /* --- Memory panel: full-width items --- */
     .memory-item { padding: 6px 8px; font-size: 11px; }
     .mem-section { padding: 6px 8px; }
