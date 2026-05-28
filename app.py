@@ -978,6 +978,57 @@ def delete_outline_node(project_id, node_id):
     conn.close()
     return jsonify({'success': True})
 
+# ========== 卷管理 ==========
+
+@app.route('/api/projects/<project_id>/volumes', methods=['GET'])
+def list_volumes(project_id):
+    conn = get_db(project_id)
+    rows = conn.execute('SELECT * FROM volumes ORDER BY sort_order').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/projects/<project_id>/volumes', methods=['POST'])
+def create_volume(project_id):
+    data = request.get_json()
+    if not data.get('title'):
+        return jsonify({'error': '卷标题不能为空'}), 400
+    conn = get_db(project_id)
+    vid = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    max_order = conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 as n FROM volumes').fetchone()['n']
+    conn.execute('INSERT INTO volumes (id, title, description, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)',
+               (vid, data['title'], data.get('description', ''), data.get('sort_order', max_order), now, now))
+    conn.commit()
+    conn.close()
+    return jsonify({'id': vid, 'title': data['title'], 'sort_order': max_order}), 201
+
+@app.route('/api/projects/<project_id>/volumes/<vid>', methods=['PUT'])
+def update_volume(project_id, vid):
+    data = request.get_json()
+    conn = get_db(project_id)
+    updates = []
+    params = []
+    for field in ['title', 'description', 'sort_order']:
+        if field in data:
+            updates.append(f'{field}=?')
+            params.append(data[field])
+    if updates:
+        params.append(datetime.utcnow().isoformat())
+        params.append(vid)
+        conn.execute(f'UPDATE volumes SET {", ".join(updates)}, updated_at=? WHERE id=?', params)
+        conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/projects/<project_id>/volumes/<vid>', methods=['DELETE'])
+def delete_volume(project_id, vid):
+    conn = get_db(project_id)
+    conn.execute('UPDATE chapters SET volume_id=NULL WHERE volume_id=?', (vid,))
+    conn.execute('DELETE FROM volumes WHERE id=?', (vid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
 # ===== 章节管理 API =====
 @app.route('/api/projects/<project_id>/chapters', methods=['GET'])
 def list_chapters(project_id):
