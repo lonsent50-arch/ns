@@ -142,41 +142,63 @@ var SupabaseAuth = (function() {
         modal.className = 'modal-overlay';
         modal.innerHTML =
             '<div class="modal-content auth-modal-content">' +
-            '<div class="modal-header">' +
-            '<h3>登录 / 注册 Novel Studio</h3>' +
-            '<button class="modal-close" onclick="SupabaseAuth.hideModal()">✕</button>' +
+            // Brand header
+            '<div class="auth-brand">' +
+            '<div class="auth-brand-icon">NS</div>' +
+            '<div class="auth-brand-text">Novel Studio</div>' +
+            '<div class="auth-brand-sub">工业级 AI 网文工作台</div>' +
             '</div>' +
+            // Close button
+            '<button class="modal-close auth-close-btn" onclick="SupabaseAuth.hideModal()">✕</button>' +
+            // Tabs
             '<div class="auth-tabs">' +
-            '<button class="auth-tab active" onclick="SupabaseAuth._switchAuthTab(\'email\')">📧 邮箱</button>' +
-            '<button class="auth-tab" onclick="SupabaseAuth._switchAuthTab(\'phone\')">📱 手机号</button>' +
+            '<button class="auth-tab active" onclick="SupabaseAuth._switchAuthTab(\'email\')">📧 邮箱登录</button>' +
+            '<button class="auth-tab" onclick="SupabaseAuth._switchAuthTab(\'phone\')">📱 手机登录</button>' +
             '</div>' +
+            // Email form
             '<div class="auth-form" id="auth-form-email">' +
-            '<label>邮箱</label>' +
-            '<input type="email" id="auth-email" placeholder="your@email.com" autocomplete="email">' +
+            '<label>邮箱地址</label>' +
+            '<div class="auth-input-wrap">' +
+            '<span class="auth-input-icon">✉</span>' +
+            '<input type="email" id="auth-email" class="auth-input-iconed" placeholder="your@email.com" autocomplete="email">' +
+            '</div>' +
             '<label>密码</label>' +
-            '<input type="password" id="auth-password" placeholder="至少6位密码" autocomplete="current-password">' +
-            '<div id="auth-error" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>' +
-            '<div style="display:flex;gap:8px;margin-top:12px;">' +
-            '<button id="auth-btn-login" class="btn-auth-submit">登录</button>' +
-            '<button id="auth-btn-signup" class="btn-auth-submit secondary">注册</button>' +
+            '<div class="auth-input-wrap">' +
+            '<span class="auth-input-icon">🔒</span>' +
+            '<input type="password" id="auth-password" class="auth-input-iconed" placeholder="至少 6 位密码" autocomplete="current-password">' +
             '</div>' +
+            '<div id="auth-error" class="auth-error-msg"></div>' +
+            '<div class="auth-btn-row">' +
+            '<button id="auth-btn-login" class="btn-auth-submit">登 录</button>' +
             '</div>' +
+            '<div class="auth-divider"><span>还没有账号？</span></div>' +
+            '<button id="auth-btn-signup" class="btn-auth-submit secondary">注册新账号</button>' +
+            '</div>' +
+            // Phone form
             '<div class="auth-form" id="auth-form-phone" style="display:none;">' +
-            '<label>手机号</label>' +
-            '<input type="tel" id="auth-phone" placeholder="+8613800138000" autocomplete="tel">' +
-            '<div id="auth-otp-section" style="display:none;margin-top:8px;">' +
-            '<label>验证码</label>' +
-            '<input type="text" id="auth-otp" placeholder="6位验证码" maxlength="6" style="width:120px;">' +
+            '<label>手机号码</label>' +
+            '<div class="auth-input-wrap">' +
+            '<span class="auth-input-icon">📱</span>' +
+            '<input type="tel" id="auth-phone" class="auth-input-iconed" placeholder="+86 13800138000" autocomplete="tel">' +
             '</div>' +
-            '<div id="auth-phone-error" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>' +
-            '<div style="display:flex;gap:8px;margin-top:12px;">' +
+            '<div id="auth-otp-section" style="display:none;">' +
+            '<label style="margin-top:14px;">短信验证码</label>' +
+            '<div class="auth-input-wrap">' +
+            '<span class="auth-input-icon">🔑</span>' +
+            '<input type="text" id="auth-otp" class="auth-input-iconed" placeholder="6 位验证码" maxlength="6">' +
+            '</div>' +
+            '</div>' +
+            '<div id="auth-phone-error" class="auth-error-msg"></div>' +
+            '<div class="auth-btn-row">' +
             '<button id="auth-btn-send-otp" class="btn-auth-submit">发送验证码</button>' +
-            '<button id="auth-btn-verify-otp" class="btn-auth-submit secondary" style="display:none;">验证登录</button>' +
             '</div>' +
+            '<button id="auth-btn-verify-otp" class="btn-auth-submit secondary" style="display:none;margin-top:8px;">验证并登录</button>' +
             '</div>' +
-            '<p style="font-size:11px;color:var(--text-muted);margin-top:12px;text-align:center;">' +
-            '首次使用将自动创建账号。数据完全隔离，确保隐私安全。</p>' +
-            '</div></div>';
+            // Footer
+            '<div class="auth-footer">' +
+            '<span>🔐</span> 首次登录自动创建账号 · 数据完全隔离 · 银行级加密' +
+            '</div>' +
+            '</div>';
 
         document.body.appendChild(modal);
 
@@ -231,12 +253,14 @@ var SupabaseAuth = (function() {
         var verifyBtn = document.getElementById('auth-btn-verify-otp');
         var phoneErr = document.getElementById('auth-phone-error');
 
-        function showPhoneErr(msg) {
+        function showPhoneErr(msg, isSuccess) {
             phoneErr.textContent = msg;
+            phoneErr.style.color = isSuccess ? '#10b981' : '#ef4444';
             phoneErr.style.display = 'block';
         }
         function clearPhoneErr() {
             phoneErr.style.display = 'none';
+            phoneErr.style.color = '#ef4444';
         }
 
         sendBtn.onclick = async function() {
@@ -247,11 +271,8 @@ var SupabaseAuth = (function() {
                 await signInPhone(phone);
                 otpSection.style.display = 'block';
                 sendBtn.style.display = 'none';
-                verifyBtn.style.display = 'inline-flex';
-                showPhoneErr('');
-                phoneErr.style.color = '#10b981';
-                phoneErr.style.display = 'block';
-                phoneErr.textContent = '验证码已发送，请查收短信';
+                verifyBtn.style.display = 'block';
+                showPhoneErr('验证码已发送，请查收短信', true);
             } catch(e) {
                 showPhoneErr('发送失败：' + e.message);
             }
@@ -259,7 +280,6 @@ var SupabaseAuth = (function() {
 
         verifyBtn.onclick = async function() {
             clearPhoneErr();
-            phoneErr.style.color = '#ef4444';
             var phone = phoneEl.value.trim();
             var otp = otpEl.value.trim();
             if (!otp || otp.length < 4) { showPhoneErr('请输入验证码'); return; }
