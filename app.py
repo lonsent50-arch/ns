@@ -220,25 +220,33 @@ def _configure_db_conn(conn):
     conn.execute(f'PRAGMA busy_timeout={SQLITE_TIMEOUT * 1000}')
     conn.row_factory = sqlite3.Row
 
+_migration_checked = False
+
 def _migrate_if_needed(db_path):
-    """Ensure all required tables/columns exist."""
+    """Ensure all required tables/columns exist (idempotent, runs once per process)."""
+    global _migration_checked
+    if _migration_checked:
+        return
+    project_id = Path(db_path).parent.name
+    init_project_db(project_id)
     conn = sqlite3.connect(str(db_path))
     c = conn.cursor()
-    # Check for new tables
-    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='volumes'")
-    if not c.fetchone():
-        conn.close()
-        project_id = Path(db_path).parent.name
-        init_project_db(project_id)
-        return
     # Try adding new columns (ignore if already exist)
     for col, dtype in [('status', "TEXT DEFAULT 'draft'"), ('volume_id', 'TEXT')]:
         try:
             c.execute(f"ALTER TABLE chapters ADD COLUMN {col} {dtype}")
-        except:
+        except sqlite3.OperationalError:
             pass
+    # Create new indexes
+    try:
+        c.execute('CREATE INDEX IF NOT EXISTS idx_volumes_sort ON volumes(sort_order)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_foreshadowing_status ON foreshadowing(status)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_plot_lines_type ON plot_lines(plot_type, sort_order)')
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
+    _migration_checked = True
 
 def get_db(project_id):
     """获取项目数据库连接（调用方须在完成后 conn.close()）"""
@@ -582,7 +590,7 @@ def init_project_db(project_id):
     c.execute('CREATE INDEX IF NOT EXISTS idx_outline_level ON outline(level, sort_order)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_ai_conv_created ON ai_conversations(created_at)')
-    c.execute('CREATE INDEX IF NOT EXISTS idx_plot_threads_ch ON plot_threads(chapter_id_from)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_plot_threads_ch ON plot_threads(start_chapter_id)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_volumes_sort ON volumes(sort_order)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_foreshadowing_status ON foreshadowing(status)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_plot_lines_type ON plot_lines(plot_type, sort_order)')

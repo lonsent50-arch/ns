@@ -1,6 +1,9 @@
 """迁移已有项目数据库，添加新表和新列"""
-import sqlite3, sys
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from app import init_project_db
 
 PROJECTS_DIR = Path(__file__).parent / 'projects'
 
@@ -9,51 +12,28 @@ def migrate_project(project_id):
     if not db_path.exists():
         print(f'  [{project_id}] SKIP: no database')
         return
+
+    # Use init_project_db for all table creation (eliminates schema duplication)
+    init_project_db(project_id)
+
+    import sqlite3
     conn = sqlite3.connect(str(db_path))
     c = conn.cursor()
 
-    tables = [
-        ('volumes', '''CREATE TABLE IF NOT EXISTS volumes (
-            id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)'''),
-        ('foreshadowing', '''CREATE TABLE IF NOT EXISTS foreshadowing (
-            id TEXT PRIMARY KEY, description TEXT NOT NULL,
-            planted_chapter_id TEXT, revealed_chapter_id TEXT,
-            status TEXT DEFAULT 'pending', created_at TEXT, updated_at TEXT)'''),
-        ('character_relations', '''CREATE TABLE IF NOT EXISTS character_relations (
-            id TEXT PRIMARY KEY, char_a_id TEXT NOT NULL, char_b_id TEXT NOT NULL,
-            relation_type TEXT DEFAULT 'neutral', strength INTEGER DEFAULT 1,
-            description TEXT DEFAULT '', created_at TEXT, updated_at TEXT)'''),
-        ('plot_lines', '''CREATE TABLE IF NOT EXISTS plot_lines (
-            id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT '',
-            plot_type TEXT DEFAULT 'main', status TEXT DEFAULT 'active',
-            sort_order INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT)'''),
-        ('plot_line_chapters', '''CREATE TABLE IF NOT EXISTS plot_line_chapters (
-            plot_line_id TEXT NOT NULL, chapter_id TEXT NOT NULL,
-            PRIMARY KEY (plot_line_id, chapter_id))'''),
-        ('user_config', '''CREATE TABLE IF NOT EXISTS user_config (
-            key TEXT PRIMARY KEY, value TEXT)'''),
-    ]
-
-    for name, sql in tables:
-        try:
-            c.execute(sql)
-            print(f'  [{project_id}] table {name}: OK')
-        except Exception as e:
-            print(f'  [{project_id}] table {name}: SKIP ({e})')
-
+    # Add new columns (ignore if already exist)
     for col, dtype in [('status', "TEXT DEFAULT 'draft'"), ('volume_id', 'TEXT')]:
         try:
             c.execute(f"ALTER TABLE chapters ADD COLUMN {col} {dtype}")
             print(f'  [{project_id}] chapters.{col}: ADDED')
-        except:
+        except sqlite3.OperationalError:
             print(f'  [{project_id}] chapters.{col}: already exists')
 
+    # Create new indexes
     try:
         c.execute('CREATE INDEX IF NOT EXISTS idx_volumes_sort ON volumes(sort_order)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_foreshadowing_status ON foreshadowing(status)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_plot_lines_type ON plot_lines(plot_type, sort_order)')
-    except:
+    except sqlite3.OperationalError:
         pass
 
     conn.commit()
