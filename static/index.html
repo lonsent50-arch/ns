@@ -43,7 +43,10 @@
             </div>
             <div class="bs-actions">
                 <button class="bs-btn bs-btn-import" onclick="NS.navigate('#import')">📂 导入</button>
-                <button class="bs-btn bs-btn-config" onclick="NS.navigate('#ai-config')">⚙️ AI配置</button>
+                <div class="bs-credits" id="bs-credits" title="点击充值" onclick="NS._showRechargeDialog()">
+                    <span class="bs-credits-balance" id="bs-credits-balance">💰 --</span>
+                    <span class="bs-credits-usage" id="bs-credits-usage"></span>
+                </div>
                 <div id="auth-area" style="display:flex;align-items:center;"></div>
             </div>
         </header>
