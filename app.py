@@ -1206,19 +1206,29 @@ def delete_chapter(project_id, chapter_id):
 
 @app.route('/api/projects/<project_id>/chapters/reorder', methods=['POST'])
 def reorder_chapters(project_id):
-    """重新排序章节"""
-    data = request.json
-    repo = get_repo()
-    if repo:
-        repo.reorder_chapters(data.get('chapter_ids', []))
-        return jsonify({'success': True})
-
+    data = request.get_json()
+    items = data.get('items', [])
     conn = get_db(project_id)
-    for idx, chapter_id in enumerate(data.get('chapter_ids', [])):
-        conn.execute('UPDATE chapters SET sort_order = ? WHERE id = ?', (idx, chapter_id))
+    now = datetime.utcnow().isoformat()
+    for item in items:
+        conn.execute('UPDATE chapters SET sort_order=?, volume_id=?, updated_at=? WHERE id=?',
+                   (item['sort_order'], item.get('volume_id'), now, item['id']))
     conn.commit()
     conn.close()
-    return jsonify({'success': True})
+    return jsonify({'status': 'ok', 'count': len(items)})
+
+@app.route('/api/projects/<project_id>/chapters/<chapter_id>/status', methods=['PUT'])
+def update_chapter_status(project_id, chapter_id):
+    data = request.get_json()
+    status = data.get('status')
+    if status not in ('draft', 'polishing', 'done'):
+        return jsonify({'error': '无效状态'}), 400
+    conn = get_db(project_id)
+    conn.execute('UPDATE chapters SET status=?, updated_at=? WHERE id=?',
+               (status, datetime.utcnow().isoformat(), chapter_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
 
 # ===== 写作统计 API =====
 @app.route('/api/projects/<project_id>/stats', methods=['GET'])
