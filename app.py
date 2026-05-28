@@ -678,13 +678,13 @@ def create_project():
     now = datetime.now().isoformat()
 
     conn = get_db(project_id)
-    conn.execute('INSERT INTO project_info VALUES (?, ?)', ('name', name))
+    conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', ('name', name))
     if desc:
-        conn.execute('INSERT INTO project_info VALUES (?, ?)', ('description', desc))
+        conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', ('description', desc))
     if genre:
-        conn.execute('INSERT INTO project_info VALUES (?, ?)', ('genre', genre))
-    conn.execute('INSERT INTO project_info VALUES (?, ?)', ('created_at', now))
-    conn.execute('INSERT INTO project_info VALUES (?, ?)', ('updated_at', now))
+        conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', ('genre', genre))
+    conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', ('created_at', now))
+    conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', ('updated_at', now))
     conn.commit()
     conn.close()
 
@@ -761,7 +761,7 @@ def update_project_info(project_id):
         if existing:
             conn.execute('UPDATE project_info SET value = ? WHERE key = ?', (str(value), key))
         else:
-            conn.execute('INSERT INTO project_info VALUES (?, ?)', (key, str(value)))
+            conn.execute('INSERT INTO project_info (key, value) VALUES (?, ?)', (key, str(value)))
     conn.execute('UPDATE project_info SET value = ? WHERE key = ?',
                  (datetime.now().isoformat(), 'updated_at'))
     conn.commit()
