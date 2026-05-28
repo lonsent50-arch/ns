@@ -220,11 +220,32 @@ def _configure_db_conn(conn):
     conn.execute(f'PRAGMA busy_timeout={SQLITE_TIMEOUT * 1000}')
     conn.row_factory = sqlite3.Row
 
+def _migrate_if_needed(db_path):
+    """Ensure all required tables/columns exist."""
+    conn = sqlite3.connect(str(db_path))
+    c = conn.cursor()
+    # Check for new tables
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='volumes'")
+    if not c.fetchone():
+        conn.close()
+        project_id = Path(db_path).parent.name
+        init_project_db(project_id)
+        return
+    # Try adding new columns (ignore if already exist)
+    for col, dtype in [('status', "TEXT DEFAULT 'draft'"), ('volume_id', 'TEXT')]:
+        try:
+            c.execute(f"ALTER TABLE chapters ADD COLUMN {col} {dtype}")
+        except:
+            pass
+    conn.commit()
+    conn.close()
+
 def get_db(project_id):
     """获取项目数据库连接（调用方须在完成后 conn.close()）"""
     db_path = PROJECTS_DIR / project_id / 'novel.db'
     conn = sqlite3.connect(str(db_path))
     _configure_db_conn(conn)
+    _migrate_if_needed(db_path)
     return conn
 
 from contextlib import contextmanager
@@ -232,8 +253,10 @@ from contextlib import contextmanager
 @contextmanager
 def get_db_safe(project_id):
     """安全数据库上下文管理器，自动关闭连接，异常安全"""
-    conn = sqlite3.connect(str(PROJECTS_DIR / project_id / 'novel.db'))
+    db_path = PROJECTS_DIR / project_id / 'novel.db'
+    conn = sqlite3.connect(str(db_path))
     _configure_db_conn(conn)
+    _migrate_if_needed(db_path)
     try:
         yield conn
     finally:
@@ -324,7 +347,9 @@ def init_project_db(project_id):
             created_at TEXT,
             updated_at TEXT,
             word_count INTEGER DEFAULT 0,
-            source TEXT DEFAULT 'manual'
+            source TEXT DEFAULT 'manual',
+            status TEXT DEFAULT 'draft',
+            volume_id TEXT
         )
     ''')
     
@@ -412,6 +437,76 @@ def init_project_db(project_id):
         )
     ''')
 
+    # 卷表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS volumes (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+
+    # 伏笔表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS foreshadowing (
+            id TEXT PRIMARY KEY,
+            description TEXT NOT NULL,
+            planted_chapter_id TEXT,
+            revealed_chapter_id TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+
+    # 角色关系表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS character_relations (
+            id TEXT PRIMARY KEY,
+            char_a_id TEXT NOT NULL,
+            char_b_id TEXT NOT NULL,
+            relation_type TEXT DEFAULT 'neutral',
+            strength INTEGER DEFAULT 1,
+            description TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+
+    # 情节线表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS plot_lines (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            plot_type TEXT DEFAULT 'main',
+            status TEXT DEFAULT 'active',
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+
+    # 情节线-章节关联表
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS plot_line_chapters (
+            plot_line_id TEXT NOT NULL,
+            chapter_id TEXT NOT NULL,
+            PRIMARY KEY (plot_line_id, chapter_id)
+        )
+    ''')
+
+    # 用户配置表（项目级）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+
     # 情节线程表
     c.execute('''
         CREATE TABLE IF NOT EXISTS plot_threads (
@@ -488,6 +583,9 @@ def init_project_db(project_id):
     c.execute('CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_ai_conv_created ON ai_conversations(created_at)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_plot_threads_ch ON plot_threads(chapter_id_from)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_volumes_sort ON volumes(sort_order)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_foreshadowing_status ON foreshadowing(status)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_plot_lines_type ON plot_lines(plot_type, sort_order)')
 
     # RLS 占位：为后续多租户隔离预留 user_id 列
     try:
