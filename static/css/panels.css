@@ -227,3 +227,567 @@
 #panel-pov-control select:focus {
     border-color: var(--accent);
 }
+
+/* ═══ Memory Panel — Tabs, Relations, Foreshadowing, Plot Lines, Timeline ═══ */
+
+/* Tab bar */
+.mem-tabs {
+    display: flex;
+    gap: 0;
+    padding: 6px 8px 0 8px;
+    background: var(--bg-surface);
+    border-bottom: 0.5px solid var(--border);
+}
+
+.mem-tab {
+    flex: 1;
+    padding: 7px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+    text-align: center;
+}
+
+.mem-tab:hover {
+    color: var(--text-secondary);
+    border-bottom-color: var(--border-strong);
+}
+
+.mem-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.mem-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+/* Section */
+.mem-section {
+    padding: 8px 10px;
+    border-bottom: 0.5px solid var(--border);
+}
+
+.mem-section:last-child {
+    border-bottom: none;
+}
+
+.mem-section-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.mem-empty {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Relation List Item */
+.mem-relation-item {
+    padding: 8px;
+    margin-bottom: 6px;
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    position: relative;
+}
+
+.mem-rel-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.mem-rel-char {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mem-rel-arrow {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.mem-rel-badge {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.mem-rel-strength {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.mem-rel-strength-label {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.mem-rel-strength-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-input);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mem-rel-strength-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.mem-rel-strength-val {
+    font-size: 10px;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: right;
+}
+
+.mem-rel-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+
+.mem-btn-del {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 6px;
+    font-size: 10px;
+    background: transparent;
+    border: 0.5px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mem-btn-del:hover {
+    color: var(--red);
+    border-color: var(--red);
+    background: var(--red-dim);
+}
+
+.mem-btn-sm {
+    padding: 2px 8px;
+    font-size: 10px;
+    background: var(--bg-surface2);
+    border: 0.5px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mem-btn-sm:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.mem-btn-danger:hover {
+    color: var(--red);
+    border-color: var(--red);
+    background: var(--red-dim);
+}
+
+.mem-btn-primary {
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mem-btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.mem-btn-cancel {
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    background: transparent;
+    color: var(--text-muted);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+
+.mem-btn-cancel:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+/* Form elements */
+.mem-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mem-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.mem-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.mem-input,
+.mem-select,
+.mem-textarea {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 0.5px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.mem-input:focus,
+.mem-select:focus,
+.mem-textarea:focus {
+    border-color: var(--accent);
+}
+
+.mem-select {
+    cursor: pointer;
+}
+
+.mem-textarea {
+    resize: vertical;
+    min-height: 40px;
+}
+
+.mem-range {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.mem-form-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+/* Canvas graph */
+.mem-canvas-wrap {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    background: var(--bg-surface);
+}
+
+#mem-graph-canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Foreshadowing items */
+.mem-fs-item {
+    padding: 8px;
+    margin-bottom: 6px;
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.mem-fs-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.mem-fs-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.mem-fs-badge {
+    font-size: 9px;
+    padding: 1px 8px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.mem-badge-planted {
+    background: rgba(245,158,11,0.12);
+    color: var(--orange);
+    border: 0.5px solid rgba(245,158,11,0.25);
+}
+
+.mem-badge-revealed {
+    background: rgba(48,209,88,0.12);
+    color: var(--green);
+    border: 0.5px solid rgba(48,209,88,0.25);
+}
+
+.mem-fs-desc {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin-bottom: 4px;
+}
+
+.mem-fs-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 6px;
+}
+
+.mem-fs-sep {
+    color: var(--border-strong);
+}
+
+.mem-fs-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Plot Line Group Header */
+.mem-pl-group-header {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-surface2);
+    border-radius: 4px;
+}
+
+.mem-pl-group-icon {
+    font-size: 8px;
+}
+
+.mem-pl-count {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+/* Plot Line Item */
+.mem-pl-item {
+    padding: 8px;
+    margin-bottom: 6px;
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    position: relative;
+}
+
+.mem-pl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.mem-pl-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mem-pl-status {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.mem-badge-active {
+    background: rgba(10,132,255,0.12);
+    color: var(--accent);
+    border: 0.5px solid rgba(10,132,255,0.25);
+}
+
+.mem-badge-completed {
+    background: rgba(48,209,88,0.12);
+    color: var(--green);
+    border: 0.5px solid rgba(48,209,88,0.25);
+}
+
+.mem-badge-abandoned {
+    background: rgba(142,142,147,0.12);
+    color: var(--text-muted);
+    border: 0.5px solid rgba(142,142,147,0.25);
+}
+
+.mem-pl-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.mem-pl-chapters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.mem-pl-ch-tag {
+    font-size: 10px;
+    padding: 1px 8px;
+    background: var(--bg-surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--accent);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.mem-pl-ch-tag:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+}
+
+/* Timeline */
+.mem-timeline {
+    padding: 4px 0;
+}
+
+.mem-tl-item {
+    display: flex;
+    gap: 10px;
+    min-height: 48px;
+}
+
+.mem-tl-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 20px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.mem-tl-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    border: 2px solid var(--bg-base);
+    flex-shrink: 0;
+    margin-top: 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.mem-tl-dot-done {
+    background: var(--green);
+    box-shadow: 0 0 6px rgba(48,209,88,0.4);
+}
+
+.mem-tl-dot-draft {
+    background: var(--orange);
+    box-shadow: 0 0 6px rgba(245,158,11,0.3);
+}
+
+.mem-tl-dot-pending {
+    background: var(--text-muted);
+}
+
+.mem-tl-connector {
+    width: 2px;
+    flex: 1;
+    min-height: 28px;
+    background: var(--border);
+}
+
+.mem-tl-content {
+    flex: 1;
+    padding: 4px 0 10px 0;
+    cursor: pointer;
+    transition: background var(--transition);
+    border-radius: 4px;
+    padding-left: 6px;
+    margin-left: -6px;
+}
+
+.mem-tl-content:hover {
+    background: var(--bg-hover);
+}
+
+.mem-tl-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.mem-tl-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+}
+
+.mem-tl-status {
+    color: var(--text-muted);
+}
+
+.mem-tl-words {
+    color: var(--text-muted);
+}
+
+/* Ensure memory panel body has no gap spacing */
+#memory-panel-body {
+    padding: 0;
+    gap: 0;
+}
+
