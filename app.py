@@ -6802,6 +6802,136 @@ def api_support_chat():
     result = call_ai(messages, model='deepseek', temperature=0.5, max_tokens=500)
     return jsonify({'reply': result, 'model': 'deepseek'})
 
+# ========== 记忆系统 ==========
+
+# --- 角色关系 ---
+@app.route('/api/projects/<project_id>/memory/relations', methods=['GET'])
+def get_character_relations(project_id):
+    conn = get_db(project_id)
+    rows = conn.execute('SELECT * FROM character_relations').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/projects/<project_id>/memory/relations', methods=['POST'])
+def save_character_relation(project_id):
+    data = request.get_json()
+    if not data.get('char_a_id') or not data.get('char_b_id'):
+        return jsonify({'error': '需要两个角色ID'}), 400
+    conn = get_db(project_id)
+    rid = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    conn.execute('''INSERT INTO character_relations (id, char_a_id, char_b_id, relation_type, strength, description, created_at, updated_at)
+                  VALUES (?,?,?,?,?,?,?,?)''',
+               (rid, data['char_a_id'], data['char_b_id'], data.get('relation_type', 'neutral'),
+                data.get('strength', 1), data.get('description', ''), now, now))
+    conn.commit()
+    conn.close()
+    return jsonify({'id': rid}), 201
+
+@app.route('/api/projects/<project_id>/memory/relations/<rid>', methods=['DELETE'])
+def delete_character_relation(project_id, rid):
+    conn = get_db(project_id)
+    conn.execute('DELETE FROM character_relations WHERE id=?', (rid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+# --- 伏笔 ---
+@app.route('/api/projects/<project_id>/memory/foreshadowing', methods=['GET'])
+def get_foreshadowing(project_id):
+    conn = get_db(project_id)
+    rows = conn.execute('SELECT * FROM foreshadowing ORDER BY created_at').fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/projects/<project_id>/memory/foreshadowing', methods=['POST'])
+def save_foreshadowing(project_id):
+    data = request.get_json()
+    conn = get_db(project_id)
+    fid = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    conn.execute('''INSERT INTO foreshadowing (id, description, planted_chapter_id, revealed_chapter_id, status, created_at, updated_at)
+                  VALUES (?,?,?,?,?,?,?)''',
+               (fid, data.get('description', ''), data.get('planted_chapter_id'), data.get('revealed_chapter_id'),
+                data.get('status', 'pending'), now, now))
+    conn.commit()
+    conn.close()
+    return jsonify({'id': fid}), 201
+
+@app.route('/api/projects/<project_id>/memory/foreshadowing/<fid>', methods=['PUT'])
+def update_foreshadowing(project_id, fid):
+    data = request.get_json()
+    conn = get_db(project_id)
+    allowed = ['description', 'planted_chapter_id', 'revealed_chapter_id', 'status']
+    updates = []
+    params = []
+    for f in allowed:
+        if f in data:
+            updates.append(f'{f}=?')
+            params.append(data[f])
+    if updates:
+        params.append(datetime.utcnow().isoformat())
+        params.append(fid)
+        conn.execute(f'UPDATE foreshadowing SET {", ".join(updates)}, updated_at=? WHERE id=?', params)
+        conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/projects/<project_id>/memory/foreshadowing/<fid>', methods=['DELETE'])
+def delete_foreshadowing(project_id, fid):
+    conn = get_db(project_id)
+    conn.execute('DELETE FROM foreshadowing WHERE id=?', (fid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+# --- 情节线 (主线/支线/隐藏线) ---
+@app.route('/api/projects/<project_id>/memory/plot-lines', methods=['GET'])
+def get_plot_lines(project_id):
+    conn = get_db(project_id)
+    rows = conn.execute('SELECT * FROM plot_lines ORDER BY plot_type, sort_order').fetchall()
+    lines = []
+    for r in rows:
+        line = dict(r)
+        chs = conn.execute('SELECT chapter_id FROM plot_line_chapters WHERE plot_line_id=?', (r['id'],)).fetchall()
+        line['chapter_ids'] = [c['chapter_id'] for c in chs]
+        lines.append(line)
+    conn.close()
+    return jsonify(lines)
+
+@app.route('/api/projects/<project_id>/memory/plot-lines', methods=['POST'])
+def save_plot_line(project_id):
+    data = request.get_json()
+    if not data.get('title'):
+        return jsonify({'error': '情节线标题不能为空'}), 400
+    conn = get_db(project_id)
+    pid = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+    plot_type = data.get('plot_type', 'main')
+    if plot_type not in ('main', 'sub', 'hidden'):
+        plot_type = 'main'
+    max_order = conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 as n FROM plot_lines WHERE plot_type=?',
+                           (plot_type,)).fetchone()['n']
+    conn.execute('''INSERT INTO plot_lines (id, title, description, plot_type, status, sort_order, created_at, updated_at)
+                  VALUES (?,?,?,?,?,?,?,?)''',
+               (pid, data['title'], data.get('description', ''), plot_type,
+                data.get('status', 'active'), max_order, now, now))
+    if data.get('chapter_ids'):
+        for cid in data['chapter_ids']:
+            conn.execute('INSERT OR IGNORE INTO plot_line_chapters (plot_line_id, chapter_id) VALUES (?,?)', (pid, cid))
+    conn.commit()
+    conn.close()
+    return jsonify({'id': pid, 'plot_type': plot_type}), 201
+
+@app.route('/api/projects/<project_id>/memory/plot-lines/<pid>', methods=['DELETE'])
+def delete_plot_line(project_id, pid):
+    conn = get_db(project_id)
+    conn.execute('DELETE FROM plot_line_chapters WHERE plot_line_id=?', (pid,))
+    conn.execute('DELETE FROM plot_lines WHERE id=?', (pid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
 # ===== 主页面 =====
 @app.route('/')
 def index():
