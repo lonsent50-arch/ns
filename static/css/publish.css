@@ -1,2 +1,288 @@
-/* Novel Studio — Publish module (placeholder) */
-.publish-container{display:flex;height:100dvh;width:100%;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px}
+/* Novel Studio — Publish module styles */
+
+/* ===== Layout ===== */
+.publish-container {
+    display: flex;
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+}
+
+.pub-layout {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    gap: 0;
+}
+
+/* ===== Left Column — Cover Preview ===== */
+.pub-left {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    background: var(--bg-elevated);
+    border-right: 0.5px solid var(--border);
+    gap: 20px;
+}
+
+.pub-cover-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: calc(100dvh - 160px);
+    width: 100%;
+    overflow: hidden;
+}
+
+.pub-cover-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    object-fit: contain;
+}
+
+.pub-download-btn {
+    flex-shrink: 0;
+    min-width: 180px;
+}
+
+/* ===== Right Column — Controls ===== */
+.pub-right {
+    width: 50%;
+    overflow-y: auto;
+    padding: 28px 28px 40px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pub-section {
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.pub-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+    padding-bottom: 6px;
+    border-bottom: 0.5px solid var(--border);
+}
+
+/* ===== Form Elements ===== */
+.pub-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pub-form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.pub-form-half {
+    flex: 1;
+    min-width: 0;
+}
+
+.pub-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.pub-input,
+.pub-select {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--bg-input);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.pub-input:focus,
+.pub-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.pub-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2398989d' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+}
+
+.pub-range {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-surface2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.pub-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 0 3px var(--accent-dim);
+    transition: box-shadow var(--transition);
+}
+
+.pub-range::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px var(--accent-dim);
+}
+
+.pub-textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 12px;
+    background: var(--bg-input);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.pub-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* ===== Buttons ===== */
+.pub-random-btn {
+    align-self: flex-start;
+}
+
+.pub-gen-btn {
+    align-self: flex-start;
+}
+
+.pub-regen-btn {
+    align-self: flex-start;
+}
+
+.pub-export-btns {
+    display: flex;
+    gap: 12px;
+}
+
+.pub-export-btn {
+    flex: 1;
+}
+
+/* ===== Button base (shared) ===== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    letter-spacing: -0.01em;
+    transition: background var(--transition), box-shadow var(--transition), opacity var(--transition);
+    white-space: nowrap;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-accent {
+    background: var(--accent);
+    color: #fff;
+}
+
+.btn-accent:hover:not(:disabled) {
+    background: var(--accent-hover);
+    box-shadow: var(--shadow-glow);
+}
+
+.btn-secondary {
+    background: var(--bg-surface2);
+    color: var(--text-primary);
+    border: 0.5px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+    .pub-layout {
+        flex-direction: column;
+    }
+
+    .pub-left {
+        width: 100%;
+        padding: 20px 16px;
+        border-right: none;
+        border-bottom: 0.5px solid var(--border);
+    }
+
+    .pub-cover-wrap {
+        max-height: 360px;
+    }
+
+    .pub-right {
+        width: 100%;
+        padding: 20px 16px 40px 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    .pub-cover-wrap {
+        max-height: 280px;
+    }
+
+    .pub-form-row {
+        flex-direction: column;
+    }
+
+    .pub-export-btns {
+        flex-direction: column;
+    }
+}
