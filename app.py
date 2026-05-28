@@ -1018,7 +1018,7 @@ def update_volume(project_id, vid):
         conn.execute(f'UPDATE volumes SET {", ".join(updates)}, updated_at=? WHERE id=?', params)
         conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 @app.route('/api/projects/<project_id>/volumes/<vid>', methods=['DELETE'])
 def delete_volume(project_id, vid):
@@ -1027,7 +1027,7 @@ def delete_volume(project_id, vid):
     conn.execute('DELETE FROM volumes WHERE id=?', (vid,))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 # ===== 章节管理 API =====
 @app.route('/api/projects/<project_id>/chapters', methods=['GET'])
@@ -1215,7 +1215,7 @@ def reorder_chapters(project_id):
                    (item['sort_order'], item.get('volume_id'), now, item['id']))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok', 'count': len(items)})
+    return jsonify({'success': True, 'count': len(items)})
 
 @app.route('/api/projects/<project_id>/chapters/<chapter_id>/status', methods=['PUT'])
 def update_chapter_status(project_id, chapter_id):
@@ -6834,7 +6834,7 @@ def delete_character_relation(project_id, rid):
     conn.execute('DELETE FROM character_relations WHERE id=?', (rid,))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 # --- 伏笔 ---
 @app.route('/api/projects/<project_id>/memory/foreshadowing', methods=['GET'])
@@ -6875,7 +6875,7 @@ def update_foreshadowing(project_id, fid):
         conn.execute(f'UPDATE foreshadowing SET {", ".join(updates)}, updated_at=? WHERE id=?', params)
         conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 @app.route('/api/projects/<project_id>/memory/foreshadowing/<fid>', methods=['DELETE'])
 def delete_foreshadowing(project_id, fid):
@@ -6883,7 +6883,7 @@ def delete_foreshadowing(project_id, fid):
     conn.execute('DELETE FROM foreshadowing WHERE id=?', (fid,))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 # --- 情节线 (主线/支线/隐藏线) ---
 @app.route('/api/projects/<project_id>/memory/plot-lines', methods=['GET'])
@@ -6930,7 +6930,7 @@ def delete_plot_line(project_id, pid):
     conn.execute('DELETE FROM plot_lines WHERE id=?', (pid,))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 # ===== 主页面 =====
 @app.route('/')
@@ -7231,8 +7231,9 @@ def import_chapters(project_id):
     vid = None
     if volume_title:
         vid = str(uuid.uuid4())
-        conn.execute('INSERT INTO volumes (id, title, sort_order, created_at, updated_at) VALUES (?,?,0,?,?)',
-                   (vid, volume_title, now, now))
+        max_order = conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 as n FROM volumes').fetchone()['n']
+        conn.execute('INSERT INTO volumes (id, title, sort_order, created_at, updated_at) VALUES (?,?,?,?,?)',
+                   (vid, volume_title, max_order, now, now))
 
     for i, node in enumerate(nodes):
         cid = str(uuid.uuid4())
@@ -7297,6 +7298,7 @@ def get_user_config():
     db_path = Path('data') / 'user_settings.db'
     db_path.parent.mkdir(exist_ok=True)
     conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
     conn.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
     rows = conn.execute('SELECT key, value FROM settings').fetchall()
     conn.close()
@@ -7308,12 +7310,13 @@ def save_user_config():
     db_path = Path('data') / 'user_settings.db'
     db_path.parent.mkdir(exist_ok=True)
     conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
     conn.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
     for key, value in data.items():
         conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)', (key, str(value)))
     conn.commit()
     conn.close()
-    return jsonify({'status': 'ok'})
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     import sys
