@@ -1,0 +1,285 @@
+/* Novel Studio — Bookshelf page styles */
+
+/* ═══ Bookshelf Container ═══ */
+.bookshelf-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* ═══ Bookshelf Header ═══ */
+.bookshelf-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    background: rgba(12,12,18,0.92);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+
+.bs-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.bs-logo-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800; color: #fff;
+    box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.bs-logo-text {
+    font-size: 16px; font-weight: 700; color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.bs-logo-sub {
+    font-size: 12px; color: var(--text-muted); font-weight: 400;
+}
+
+/* ═══ Search ═══ */
+.bs-search {
+    flex: 1;
+    max-width: 320px;
+}
+
+.bs-search-input {
+    width: 100%;
+    padding: 8px 14px;
+    background: var(--bg-input);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: all var(--transition);
+}
+.bs-search-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.bs-search-input::placeholder {
+    color: var(--text-placeholder);
+}
+
+/* ═══ Actions ═══ */
+.bs-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.bs-btn {
+    padding: 8px 16px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+    white-space: nowrap;
+}
+.bs-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.bs-btn-import:hover { border-color: var(--accent2); color: var(--accent2); }
+.bs-btn-config:hover { border-color: var(--accent); color: var(--accent-hover); }
+
+/* ═══ Filter Tabs ═══ */
+.bs-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 24px;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+
+.bs-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+.bs-tab:hover {
+    color: var(--text-secondary);
+}
+.bs-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+
+/* ═══ Project Grid ═══ */
+.bs-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+    align-content: start;
+}
+
+/* ═══ Project Card ═══ */
+.bs-card {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+    position: relative;
+    min-height: 160px;
+}
+.bs-card:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.bs-card.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.bs-card-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    line-height: 1;
+}
+
+.bs-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bs-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.bs-card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex: 1;
+}
+
+.bs-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.bs-card-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bs-card-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+}
+.bs-card-dot.active { background: var(--green); }
+.bs-card-dot.draft { background: var(--text-muted); }
+.bs-card-dot.done { background: var(--accent); }
+
+.bs-card-del {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: 0.5px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    opacity: 0;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+.bs-card:hover .bs-card-del { opacity: 1; border-color: var(--border); }
+.bs-card-del:hover {
+    background: rgba(255,69,58,0.12);
+    border-color: rgba(255,69,58,0.3);
+    color: #ff453a;
+}
+
+/* ═══ New Project Card ═══ */
+.bs-card-new {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: transparent;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+    min-height: 160px;
+    gap: 8px;
+}
+.bs-card-new:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.bs-card-new-icon {
+    font-size: 32px;
+    opacity: 0.6;
+}
+
+.bs-card-new-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+.bs-card-new:hover .bs-card-new-label {
+    color: var(--accent-hover);
+}

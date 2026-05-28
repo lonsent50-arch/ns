@@ -1,0 +1,437 @@
+/* Novel Studio — Three-panel workspace layout + editor styles */
+
+/* ═══ Workspace Layout ═══ */
+.workspace-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+}
+
+/* ═══ Left Panel ═══ */
+.ws-left {
+    background: rgba(12,12,18,0.92);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-right: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ws-left-header {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+
+.ws-back-btn {
+    padding: 5px 10px;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+    white-space: nowrap;
+}
+.ws-back-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.ws-project-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* ═══ Volume/Chapter Tree ═══ */
+.ws-volumes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+
+.ws-volume {
+    margin-bottom: 2px;
+}
+
+.ws-volume-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    margin: 1px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+.ws-volume-header:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.ws-volume-toggle {
+    width: 14px;
+    font-size: 9px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s;
+}
+.ws-volume-toggle.expanded { transform: rotate(90deg); }
+
+.ws-volume-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws-volume-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.ws-chapters {
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+.ws-chapters.collapsed { max-height: 0 !important; }
+
+.ws-chapter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 6px 28px;
+    margin: 1px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 12.5px;
+    color: var(--text-secondary);
+}
+.ws-chapter:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+.ws-chapter.active {
+    background: var(--bg-active);
+    color: var(--accent);
+    font-weight: 550;
+}
+
+.ws-chapter-index {
+    font-size: 10px;
+    color: var(--text-muted);
+    min-width: 18px;
+    flex-shrink: 0;
+}
+
+.ws-chapter-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ws-chapter-wc {
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.ws-chapter-status-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.ws-chapter-status-dot.draft { background: var(--text-muted); }
+.ws-chapter-status-dot.writing { background: var(--orange); }
+.ws-chapter-status-dot.done { background: var(--green); }
+
+/* ═══ Tree Actions ═══ */
+.ws-tree-actions {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    border-top: 0.5px solid var(--border);
+    flex-shrink: 0;
+}
+
+.ws-tree-btn {
+    flex: 1;
+    padding: 6px 8px;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+.ws-tree-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+/* ═══ Progress Bar ═══ */
+.ws-progress {
+    padding: 8px 12px;
+    border-top: 0.5px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ws-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-input);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.ws-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+
+.ws-progress-text {
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+/* ═══ Left Nav ═══ */
+.ws-left-nav {
+    padding: 8px;
+    border-top: 0.5px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ws-nav-btn {
+    width: 100%;
+    padding: 7px 10px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+    text-align: left;
+}
+.ws-nav-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* ═══ Center Panel: Editor ═══ */
+.ws-center {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+/* ═══ Editor Toolbar ═══ */
+.ws-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(12,12,18,0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    min-height: 44px;
+}
+
+.ws-editor-title {
+    flex: 1;
+    min-width: 120px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 0.5px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 700;
+    outline: none;
+    font-family: inherit;
+    transition: all var(--transition);
+}
+.ws-editor-title:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.02);
+}
+
+.ws-save-status {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    transition: color 0.3s;
+    white-space: nowrap;
+}
+.ws-save-status.saving { color: var(--orange); }
+.ws-save-status.saved { color: var(--green); }
+.ws-save-status.error { color: var(--red); }
+
+.ws-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ws-action-btn {
+    width: 32px; height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all var(--transition);
+}
+.ws-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+.ws-action-delete:hover {
+    background: rgba(255,69,58,0.15);
+    color: var(--red);
+}
+
+.ws-wordcount {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.ws-chapter-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+.ws-chapter-nav button {
+    width: 28px; height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    transition: all var(--transition);
+}
+.ws-chapter-nav button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+.ws-chapter-nav span {
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: center;
+    user-select: none;
+}
+
+/* ═══ Editor Body ═══ */
+.ws-editor-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 40px 10%;
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 17px;
+    line-height: 2;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+    background: var(--bg-base);
+    outline: none;
+    border: none;
+    resize: none;
+    font-family: 'LXGWWenKai', 'Noto Serif SC', 'Source Han Serif SC', 'PingFang SC', serif;
+    tab-size: 2;
+    width: 100%;
+}
+.ws-editor-body:empty::before {
+    content: attr(placeholder);
+    color: var(--text-placeholder);
+    white-space: pre-wrap;
+    pointer-events: none;
+    font-size: 15px;
+    line-height: 1.8;
+}
+.ws-editor-body:focus { outline: none; }
+
+/* ═══ Right Panel ═══ */
+.ws-right {
+    background: rgba(12,12,18,0.92);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-left: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 6px;
+}
+
+/* ═══ Fullscreen Mode ═══ */
+.workspace-layout.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    background: var(--bg-base);
+}
+.workspace-layout.fullscreen .ws-left { display: none; }
+.workspace-layout.fullscreen .ws-right { display: none; }
+.workspace-layout.fullscreen .ws-editor-body {
+    padding: 48px 20%;
+    font-size: 18px;
+    max-width: 100%;
+}
+@media(max-width:1200px) {
+    .workspace-layout.fullscreen .ws-editor-body { padding: 40px 12%; }
+}
+@media(max-width:700px) {
+    .workspace-layout.fullscreen .ws-editor-body { padding: 32px 8%; font-size: 16px; }
+}

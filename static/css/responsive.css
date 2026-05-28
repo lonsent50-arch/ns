@@ -1,0 +1,30 @@
+/* Novel Studio — Responsive breakpoints */
+
+/* ═══ Tablet (≤900px) ═══ */
+@media (max-width: 900px) {
+    .workspace-layout{grid-template-columns:1fr}
+    .ws-left{position:fixed;left:-280px;top:0;bottom:0;z-index:200;width:280px;transition:left 0.3s;background:rgba(12,12,18,0.98);box-shadow:4px 0 32px rgba(0,0,0,0.5)}
+    .ws-left.open{left:0}
+    .ws-right{display:none}
+    .ws-right.open{display:flex;position:fixed;right:0;top:0;bottom:0;z-index:199;width:320px}
+    .ws-editor-body{padding:30px 6%;max-width:780px}
+    .bs-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));padding:16px}
+}
+
+/* ═══ Large Phone / Small Tablet (≤700px) ═══ */
+@media (max-width: 700px) {
+    .bookshelf-header{flex-wrap:wrap;gap:8px;padding:12px 16px}
+    .bs-search{max-width:100%;order:3;flex-basis:100%}
+    .ws-editor-body{padding:20px 4%;max-width:100%;font-size:15px;line-height:1.7}
+    .ws-editor-toolbar{flex-wrap:wrap;gap:6px;padding:6px 10px}
+    .bs-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:12px}
+}
+
+/* ═══ Phone (≤480px) ═══ */
+@media (max-width: 480px) {
+    .bs-grid{grid-template-columns:1fr;padding:8px}
+    .bs-logo-sub{display:none}
+    .ws-editor-body{padding:16px 12px;max-width:100%;font-size:14px;line-height:1.65}
+    .ws-editor-actions{gap:0}
+    .ws-action-btn{width:28px;height:28px;font-size:13px}
+}
