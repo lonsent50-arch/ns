@@ -7182,6 +7182,139 @@ if is_supabase_configured():
             .eq('id', chapter_id).eq('user_id', user['id']).execute()
         return jsonify({'success': bool(result.data)})
 
+# ========== 文档解析导入 ==========
+
+@app.route('/api/ai/parse-structure', methods=['POST'])
+def parse_document_structure():
+    """AI 解析文档结构，识别卷/章分界"""
+    data = request.get_json()
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'error': '文本不能为空'}), 400
+
+    import re
+    chapter_pattern = re.compile(
+        r'(?:^|\n)\s*(?:第[零一二三四五六七八九十百千\d]+[章卷节回]|Chapter\s+\d+|CH\.?\s*\d+|'
+        r'(?:Volume|Vol\.?|Part)\s+\d+)\s*[^\n]*',
+        re.IGNORECASE
+    )
+    matches = list(chapter_pattern.finditer(text))
+
+    if not matches:
+        return jsonify({'nodes': [], 'message': '未检测到章节标记，将作为单章导入'})
+
+    nodes = []
+    for i, m in enumerate(matches):
+        title = m.group().strip().lstrip('#').strip()
+        start = m.end()
+        end = matches[i+1].start() if i + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        nodes.append({
+            'index': i,
+            'title': title,
+            'content_preview': body[:200] + ('...' if len(body) > 200 else ''),
+            'content': body,
+            'char_count': len(body)
+        })
+    return jsonify({'nodes': nodes, 'total': len(nodes)})
+
+
+@app.route('/api/projects/<project_id>/import', methods=['POST'])
+def import_chapters(project_id):
+    """批量导入章节数据"""
+    data = request.get_json()
+    nodes = data.get('nodes', [])
+    volume_title = data.get('volume_title', '')
+    conn = get_db(project_id)
+    now = datetime.utcnow().isoformat()
+
+    vid = None
+    if volume_title:
+        vid = str(uuid.uuid4())
+        conn.execute('INSERT INTO volumes (id, title, sort_order, created_at, updated_at) VALUES (?,?,0,?,?)',
+                   (vid, volume_title, now, now))
+
+    for i, node in enumerate(nodes):
+        cid = str(uuid.uuid4())
+        conn.execute('''INSERT INTO chapters (id, title, content, sort_order, volume_id, status, word_count, source, created_at, updated_at)
+                      VALUES (?,?,?,?,?,?,?,?,?,?)''',
+                   (cid, node.get('title', f'第{i+1}章'), node.get('content', ''),
+                    i, vid, 'draft', len(node.get('content', '')), 'import', now, now))
+
+    conn.commit()
+    conn.close()
+    return jsonify({'imported': len(nodes), 'volume_id': vid}), 201
+
+
+# ========== 导出 ==========
+
+@app.route('/api/projects/<project_id>/export/<fmt>', methods=['GET'])
+def export_project(project_id, fmt):
+    """导出项目为指定格式"""
+    conn = get_db(project_id)
+    info = {}
+    for row in conn.execute('SELECT key, value FROM project_info').fetchall():
+        info[row['key']] = row['value']
+
+    chapters = conn.execute('SELECT * FROM chapters ORDER BY sort_order').fetchall()
+    conn.close()
+
+    if fmt == 'txt':
+        lines = [info.get('title', '未命名'), '=' * 40, '']
+        for ch in chapters:
+            lines.append(ch['title'])
+            lines.append('-' * 20)
+            lines.append(ch['content'] or '')
+            lines.append('')
+        content = '\n'.join(lines)
+        return Response(content, mimetype='text/plain; charset=utf-8',
+                        headers={'Content-Disposition': f'attachment; filename="{info.get("title","novel")}.txt"'})
+
+    elif fmt == 'html':
+        from html import escape
+        lines = ['<!DOCTYPE html><html><head><meta charset="utf-8">',
+                 f'<title>{escape(info.get("title", "Novel"))}</title>',
+                 '<style>body{max-width:800px;margin:0 auto;padding:20px;font-family:serif;line-height:1.8}',
+                 'h1{text-align:center}h2{margin-top:2em}</style></head><body>',
+                 f'<h1>{escape(info.get("title", "Novel"))}</h1>']
+        for ch in chapters:
+            lines.append(f'<h2>{escape(ch["title"])}</h2>')
+            for p in (ch['content'] or '').split('\n'):
+                if p.strip():
+                    lines.append(f'<p>{escape(p.strip())}</p>')
+        lines.append('</body></html>')
+        return Response('\n'.join(lines), mimetype='text/html; charset=utf-8',
+                        headers={'Content-Disposition': f'attachment; filename="{info.get("title","novel")}.html"'})
+
+    return jsonify({'error': f'不支持的格式: {fmt}'}), 400
+
+
+# ========== 用户配置 ==========
+
+@app.route('/api/user/config', methods=['GET'])
+def get_user_config():
+    """获取用户全局配置"""
+    db_path = Path('data') / 'user_settings.db'
+    db_path.parent.mkdir(exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
+    rows = conn.execute('SELECT key, value FROM settings').fetchall()
+    conn.close()
+    return jsonify({r['key']: r['value'] for r in rows})
+
+@app.route('/api/user/config', methods=['PUT'])
+def save_user_config():
+    data = request.get_json()
+    db_path = Path('data') / 'user_settings.db'
+    db_path.parent.mkdir(exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
+    for key, value in data.items():
+        conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)', (key, str(value)))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
 if __name__ == '__main__':
     import sys
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get('PORT', 5050))
