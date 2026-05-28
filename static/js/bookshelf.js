@@ -34,7 +34,8 @@ var Bookshelf = (function() {
             var statusClass = st === 'done' ? 'bs-status-done' : (st === 'draft' ? 'bs-status-draft' : 'bs-status-active');
             var statusText = st === 'done' ? '已完结' : (st === 'draft' ? '草稿' : '创作中');
             var color = _projectColor(p.id);
-            html += '<div class="bs-card" onclick="NS.navigate(\'#workspace/' + p.id + '\')">' +
+            html += '<div class="bs-card" onclick="NS.navigate(\'#workspace/' + p.id + '\')" oncontextmenu="Bookshelf._showContextMenu(event,\'' + p.id + '\',\'' + escHtml(p.title || '未命名') + '\');return false">' +
+                '<button class="bs-card-del" onclick="event.stopPropagation();Bookshelf.deleteProject(\'' + p.id + '\',\'' + escHtml(p.title || '未命名') + '\')" title="删除项目">✕</button>' +
                 '<div class="bs-card-cover" style="background:linear-gradient(135deg,' + color[0] + ',' + color[1] + ')">' +
                 (p.title || '?').charAt(0).toUpperCase() +
                 '</div>' +
@@ -102,11 +103,41 @@ var Bookshelf = (function() {
         return colors[Math.abs(hash) % colors.length];
     }
 
+    function deleteProject(id, title) {
+        if (!confirm('确定删除项目「' + title + '」吗？\n\n此操作不可撤销，将永久删除所有章节和数据。')) return;
+        NS.apiDelete('/api/projects/' + id).then(function() {
+            NS.toast('项目已删除', 'success');
+            render();
+        }).catch(function(e) { NS.toast('删除失败：' + e.message, 'error'); });
+    }
+
+    function _showContextMenu(e, id, title) {
+        e.preventDefault();
+        var menu = document.getElementById('bs-context-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'bs-context-menu';
+            menu.className = 'bs-context-menu';
+            document.body.appendChild(menu);
+        }
+        menu.innerHTML = '<div class="bs-cm-item danger" data-action="delete">🗑 删除「' + escHtml(title) + '」</div>';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block';
+        menu.onclick = function(ev) {
+            var action = (ev.target.closest('[data-action]') || {}).dataset;
+            if (action.action === 'delete') { deleteProject(id, title); }
+            menu.style.display = 'none';
+        };
+        var close = function(ev2) { if (!menu.contains(ev2.target)) { menu.style.display = 'none'; document.removeEventListener('click', close); } };
+        setTimeout(function() { document.addEventListener('click', close); }, 10);
+    }
+
     function _formatWords(n) {
         if (n >= 10000) return (n / 10000).toFixed(1) + '万字';
         if (n >= 1000) return (n / 1000).toFixed(1) + '千字';
         return (n || 0) + '字';
     }
 
-    return { render: render, setFilter: setFilter, createProject: createProject, filter: filter };
+    return { render: render, setFilter: setFilter, createProject: createProject, filter: filter, deleteProject: deleteProject, _showContextMenu: _showContextMenu };
 })();
