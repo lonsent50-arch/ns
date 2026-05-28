@@ -1,7 +1,49 @@
-/* Novel Studio — Responsive breakpoints */
+/* Novel Studio — Responsive breakpoints + Transition animations */
+
+/* ═══ Transition Animations ═══ */
+
+/* View transition */
+.ns-view { animation: nsFadeIn 0.25s ease; }
+@keyframes nsFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Panel slide-in */
+.ws-right.open { animation: nsSlideIn 0.3s ease; }
+@keyframes nsSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* Card hover lift */
+.bs-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.bs-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+/* Button press */
+.ws-action-btn, .ai-quick-btn, .bs-btn { transition: transform 0.1s ease, opacity 0.1s ease; }
+.ws-action-btn:active, .ai-quick-btn:active, .bs-btn:active { transform: scale(0.96); }
+
+/* Smooth collapse */
+.ws-panel-body { transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; }
+.ws-panel-card.collapsed .ws-panel-body { display: flex; max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+
+/* Tree toggle */
+.ws-chapters { transition: max-height 0.3s ease; }
+
+/* Toast slide up */
+.toast { animation: nsToastIn 0.3s ease; }
+@keyframes nsToastIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Loading spinner */
+.ns-spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: nsSpin 0.6s linear infinite; }
+@keyframes nsSpin { to { transform: rotate(360deg); } }
+
+/* Skeleton loading */
+.ns-skeleton { background: linear-gradient(90deg, var(--bg-surface, rgba(255,255,255,0.03)) 25%, var(--bg-elevated, #16161d) 50%, var(--bg-surface, rgba(255,255,255,0.03)) 75%); background-size: 200% 100%; animation: nsShimmer 1.5s infinite; border-radius: var(--radius-sm); }
+@keyframes nsShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Overlay base (hidden by default, JS toggles visibility) */
+.ws-right-overlay { display: none; }
+.ws-left-toggle { display: none; }
 
 /* ═══ Tablet (≤900px) ═══ */
 @media (max-width: 900px) {
+    /* --- Existing rules --- */
     .workspace-layout{grid-template-columns:1fr}
     .ws-left{position:fixed;left:-280px;top:0;bottom:0;z-index:200;width:280px;transition:left 0.3s;background:rgba(12,12,18,0.98);box-shadow:4px 0 32px rgba(0,0,0,0.5)}
     .ws-left.open{left:0}
@@ -9,22 +51,177 @@
     .ws-right.open{display:flex;position:fixed;right:0;top:0;bottom:0;z-index:199;width:320px}
     .ws-editor-body{padding:30px 6%;max-width:780px}
     .bs-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));padding:16px}
+
+    /* --- Mobile toggle button (hamburger for left panel) --- */
+    .ws-left-toggle { display: flex; position: fixed; left: 8px; top: 8px; z-index: 201; width: 36px; height: 36px; align-items: center; justify-content: center; background: var(--bg-elevated, #16161d); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; font-size: 16px; box-shadow: var(--shadow); }
+
+    /* --- Right panel overlay backdrop --- */
+    .ws-right-overlay { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 198; }
+
+    /* --- Publish: stack cover + controls vertically --- */
+    .publish-container { flex-direction: column; }
+    .pub-layout { flex-direction: column; }
+    .pub-left, .pub-right { width: 100%; }
+    .pub-left { border-right: none; border-bottom: 0.5px solid var(--border); padding: 20px 16px; }
+    .pub-right { padding: 20px 16px 40px 16px; }
+    .pub-cover-wrap { max-height: 360px; }
+
+    /* --- Import: max-width 100%, reduced padding --- */
+    #import-container { padding: 30px 16px; }
+    .iw-card { max-width: 100%; }
+    .iw-body { padding: 24px 20px; }
+    .iw-actions { padding: 16px 20px; }
+    .iw-step-bar { padding: 16px 20px 14px; }
+    .iw-step-line { width: 50px; }
+    .iw-step-circle { width: 30px; height: 30px; font-size: 12px; }
+    .iw-step-label { font-size: 10px; }
+
+    /* --- Config: padding reduction, form groups stack --- */
+    .config-container { padding: 0; }
+    .ac-header { padding: 20px 16px 16px; }
+    .ac-scroll { padding: 16px; }
+    .ac-section { padding: 16px; margin-bottom: 16px; }
+    .ac-bottom-bar { padding: 12px 16px; }
+    .ac-stats-grid { gap: 8px; }
+
+    /* --- Bookshelf: compact actions --- */
+    .bs-actions { gap: 4px; }
+    .bs-btn { padding: 6px 10px; font-size: 12px; }
 }
 
 /* ═══ Large Phone / Small Tablet (≤700px) ═══ */
 @media (max-width: 700px) {
+    /* --- Existing rules --- */
     .bookshelf-header{flex-wrap:wrap;gap:8px;padding:12px 16px}
     .bs-search{max-width:100%;order:3;flex-basis:100%}
     .ws-editor-body{padding:20px 4%;max-width:100%;font-size:15px;line-height:1.7}
     .ws-editor-toolbar{flex-wrap:wrap;gap:6px;padding:6px 10px}
     .bs-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:12px}
+
+    /* --- Tabs: horizontal scroll, no wrap --- */
+    .bs-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding: 0 12px; }
+    .bs-tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; font-size: 12px; }
+
+    /* --- Editor: title reduction --- */
+    .ws-editor-title { font-size: 14px; }
+
+    /* --- Chapter nav: compact --- */
+    .ws-chapter-nav button { width: 24px; height: 24px; font-size: 10px; }
+    .ws-chapter-nav span { font-size: 10px; min-width: 24px; }
+
+    /* --- Publish: single column, reduced padding --- */
+    .pub-section { padding: 14px 16px; }
+    .pub-form-row { flex-direction: column; }
+    .pub-export-btns { flex-direction: column; }
+
+    /* --- Import: step indicator smaller dots/text --- */
+    .iw-step-circle { width: 28px; height: 28px; font-size: 11px; }
+    .iw-step-label { font-size: 9px; }
+    .iw-step-line { width: 30px; }
+
+    /* --- Config: full width sections, no max-width constraint --- */
+    .ac-section { max-width: none; }
+    .ac-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ac-stat-card { padding: 14px 10px; }
+    .ac-stat-num { font-size: 20px; }
+
+    /* --- Bookshelf card: padding/font-size reduction --- */
+    .bs-card { padding: 14px; min-height: 140px; }
+    .bs-card-icon { font-size: 26px; margin-bottom: 8px; }
+    .bs-card-title { font-size: 13px; }
+    .bs-card-desc { font-size: 11px; }
+
+    /* --- Character panel: full-width items --- */
+    .char-card-item { padding: 8px 10px; }
+    .char-card-avatar { width: 28px; height: 28px; font-size: 12px; }
+    .char-card-name { font-size: 12px; }
+
+    /* --- Memory panel: full-width items --- */
+    .memory-item { padding: 6px 8px; font-size: 11px; }
+    .mem-section { padding: 6px 8px; }
 }
 
 /* ═══ Phone (≤480px) ═══ */
 @media (max-width: 480px) {
+    /* --- Existing rules --- */
     .bs-grid{grid-template-columns:1fr;padding:8px}
     .bs-logo-sub{display:none}
     .ws-editor-body{padding:16px 12px;max-width:100%;font-size:14px;line-height:1.65}
     .ws-editor-actions{gap:0}
     .ws-action-btn{width:28px;height:28px;font-size:13px}
+
+    /* --- Tabs: compact, abbreviated text --- */
+    .bs-tab { padding: 10px 12px; font-size: 11px; }
+
+    /* --- Editor toolbar: icon-only buttons, compact --- */
+    .ws-editor-toolbar { gap: 4px; padding: 4px 8px; }
+
+    /* --- Save status / wordcount: smaller font --- */
+    .ws-save-status { font-size: 10px; }
+    .ws-wordcount { font-size: 10px; }
+
+    /* --- Toast notifications: full width, bottom of screen --- */
+    .toast { max-width: none; width: calc(100vw - 16px); border-radius: var(--radius-sm); font-size: 12px; }
+    .toast-container { top: auto; bottom: 8px; right: 8px; left: 8px; }
+
+    /* --- Modal: full screen, no border radius --- */
+    .modal-overlay { border-radius: 0; align-items: stretch; justify-content: stretch; }
+
+    /* --- Memory tabs: smaller padding, compact --- */
+    .mem-tab { padding: 5px 6px; font-size: 10px; }
+
+    /* --- All panels: remove border radius, full-width slideouts --- */
+    .ws-panel-card { border-radius: 0; }
+    .ws-left.open { width: 100vw; }
+    .ws-right.open { width: 100vw; }
+
+    /* --- Config: single-column stats --- */
+    .ac-stats-grid { grid-template-columns: 1fr; }
+    .ac-stat-card { flex-direction: row; justify-content: space-between; padding: 12px 16px; }
+    .ac-stat-num { font-size: 18px; margin-bottom: 0; }
+
+    /* --- Import: compact final step --- */
+    .iw-drop-zone { padding: 28px 12px; }
+    .iw-btn { padding: 8px 14px; font-size: 12px; }
+    .iw-actions { flex-wrap: wrap; padding: 12px 14px; }
+}
+
+/* ═══ Dark Theme Consistency ═══ */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+    }
+}
+
+/* ═══ Print Styles ═══ */
+@media print {
+    /* Hide all chrome: navigation, panels, toolbars, buttons, overlays */
+    .workspace-layout { display: block; height: auto; }
+    .ws-left, .ws-right, .ws-editor-toolbar, .ws-chapter-nav,
+    .ws-save-status, .ws-wordcount, .ws-action-btn, .ws-tree-actions,
+    .ws-progress, .ws-left-nav, .ws-left-toggle, .ws-right-overlay,
+    .toast, .toast-container, .modal-overlay,
+    .bs-search, .bs-tabs, .bs-actions, .bs-btn,
+    .config-container .ac-header, .config-container .ac-bottom-bar,
+    .ai-quick-btn, .ws-panel-header, .mem-tabs,
+    .pub-left, .pub-right .btn, .pub-download-btn { display: none !important; }
+
+    /* Show only editor content */
+    .ws-editor-body {
+        padding: 0 !important;
+        max-width: 100% !important;
+        font-size: 12pt !important;
+        line-height: 1.8 !important;
+        color: #000 !important;
+        background: #fff !important;
+        overflow: visible !important;
+        height: auto !important;
+        font-family: 'Noto Serif SC', 'Songti SC', 'PingFang SC', serif !important;
+    }
+
+    .ws-center { display: block; overflow: visible; }
+
+    body { background: #fff !important; color: #000 !important; font-size: 12pt; }
+
+    @page { margin: 2cm; }
 }
